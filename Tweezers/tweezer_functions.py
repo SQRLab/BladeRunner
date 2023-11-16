@@ -57,6 +57,20 @@ def scattering(omega_tweezer,linewidths,omega_res,P_opt,beamwaists):
     '''
     return ((3*pi*(c**2))/(hbar * (omega_tweezer**3))) *((omega_tweezer/omegares)**3)* (((linewidths/(omega_res - omega_tweezer))+
                                                                             (linewidths/(omegares + omega_tweezer)))**2) * ((P_opt)/(beam_waists**2))
+
+
+def scatteringRWA(omegatweezer,linewidths,omegares,Popt,beamwaists):
+    '''Find the scattering of the optical tweezers beam off of a given resonance
+    for the given set of parameters -- Using RWA
+    omegatweezer = angular frequency of tweezer laser beam
+    linewidths = linewidth of the given resonant transition (ex, S1/2 to D5/2)
+    Detuning = omegatweezer - omegaresonance where omegaresonance is the angular frequency corresponding to linewidth
+    counterrotating = omegatweezer+omegaresonance 
+    Popt = total optical power of tweezer laser beam
+    beamwaists = beamwaist of the tweezer laser beam given its frequency and the NA of our system'''
+    return (3*c**2/(hbar * (omegatweezer**3))) * ((linewidths/(omegares - omegatweezer))**(2)) * Popt/(beamwaists**2)
+
+
 def epsilon(d,wx,m):
     """
     Dimensionless parameter describing characteristic energy(?) scales of our ion chain
