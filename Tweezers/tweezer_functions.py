@@ -1,14 +1,15 @@
 from scipy import constants
 import numpy as np
-
+from IonChainTools import calcPositions,lengthScale
 
 #Constants in SI units
 eps0 = constants.epsilon_0
-m = 40.07*constants.atomic_mass
+m = 39.9626*constants.atomic_mass
 c = constants.c
 e = constants.e
 hbar = constants.hbar
 pi = np.pi
+
 
 def potential(omega_tweezer,linewidths,omega_res,P_opt,beam_waists):
     '''
@@ -111,4 +112,62 @@ def omega_axial(U,beam_waists,tweezer_wavelength,m):
        tweezer_wavelength = wavelgth of the tweezer laser beam
        m = mass of ion
        """
-    return ((2*abs(U)/m)**(1/2)) * 1/((pi*(beam_waist**2)/tweezer_wavelength))
+    return ((2*abs(U)/m)**(1/2)) * 1/((pi*(beam_waists**2)/tweezer_wavelength))
+
+def mode_calc_r(m,omega_r,omega_a):
+    N = len(omega_r)
+    A = np.zeros((N, N))
+    l = lengthScale(omega_a)
+    ueq = calcPositions(N)*l
+    coloumb = ((e**2) / (4 * pi * eps0))
+    masses = np.array([m for _ in range(N)])
+    for i in range(N):
+        A[i][i] = (masses[i] * omega_r[i]**2 - coloumb * sum(1 / (ueq[i] - ueq[m])**3 for m in range(0, i))
+           - coloumb * sum(1 / (ueq[m] - ueq[i])**3 for m in range(i + 1, N))) * masses[i]
+        for j in range(0, i):
+            A[i][j] = (1/(ueq[i]-ueq[j])**3) * np.sqrt(masses[i])*np.sqrt(masses[j])*(coloumb)
+        for j in range(i+1, N):
+            A[i][j] = (1/ (ueq[j]-ueq[i])**3) *np.sqrt(masses[i])*np.sqrt(masses[j])*(coloumb)
+    eigvals, eigvecs = np.linalg.eig(A) # this gives eigenvalues and eigenvectors
+    freqs =( np.sqrt(1*eigvals))/(2*pi*m) #eigenvalue = spring constant k, so freq = sqrt(e-val)/(2*pi*m)
+    
+    
+    scaledmodes = [(f, v) for f, v in zip(freqs, eigvecs.T)]
+    scaledmodes = sorted(scaledmodes, key=lambda mode: mode[0],reverse=True)
+    modes = []
+    for f, scaledvec in scaledmodes:
+        vec = np.array([scaledvec[i]/1 for i in range(len(eigvals))])
+        vec = vec / np.sqrt(vec.dot(vec))
+        modes.append((f, vec))
+    return modes
+
+def mode_calc_a(m,omega_a):
+    N = len(omega_a)
+    A = np.zeros((N, N))
+    l = lengthScale(omega_a)
+    ueq = calcPositions(N)*l
+    coloumb = ((e**2) / (4 * pi * eps0))
+    masses = np.array([m for _ in range(N)])
+    for i in range(N):
+        A[i][i] = (masses[i] * omega_a[i]**2 + coloumb * sum(2 / (ueq[i] - ueq[m])**3 for m in range(0, i))
+           + coloumb * sum(2 / (ueq[m] - ueq[i])**3 for m in range(i + 1, N))) * masses[i]
+        for j in range(0, i):
+            A[i][j] = (-2/(ueq[i]-ueq[j])**3) * np.sqrt(masses[i])*np.sqrt(masses[j])*(coloumb)
+        for j in range(i+1, N):
+            A[i][j] = (-2/ (ueq[j]-ueq[i])**3) *np.sqrt(masses[i])*np.sqrt(masses[j])*(coloumb)
+
+    eigvals, eigvecs = np.linalg.eig(A) # this gives eigenvalues and eigenvectors
+    freqs =( np.sqrt(1*eigvals))/(2*pi*m) #eigenvalue = spring constant k, so freq = sqrt(e-val)/(2*pi*m)
+    print(freqs)
+    
+    
+    scaledmodes = [(f, v) for f, v in zip(freqs, eigvecs.T)]
+    scaledmodes = sorted(scaledmodes, key=lambda mode: mode[0],reverse=False)
+    modes = []
+    for f, scaledvec in scaledmodes:
+        vec = np.array([scaledvec[i]/1 for i in range(len(eigvals))])
+        vec = vec / np.sqrt(vec.dot(vec))
+        modes.append((f, vec))
+    return modes
+
+
