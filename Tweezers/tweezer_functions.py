@@ -21,6 +21,7 @@ def potential(omega_tweezer,linewidths,omega_res,P_opt,beam_waists):
     linewidths = linewidth of the given resonant transition of ion taken from NIST database in angular frequency units 
         (ex, S1/2 to P1/2 and S1/2 to P3/2 for 40Ca+)
     P_opt = total optical power of tweezer laser beam
+    omega_res = angular frequency of resonant transition, also based off NIST data
     beam_waists = beamwaist of the tweezer laser beam
     given its frequency and the NA of our system or from measurement
     '''
@@ -39,6 +40,7 @@ def potentialRWA(omega_tweezer,linewidths,omega_res,P_opt,beam_waists):
     linewidths = linewidth of the given resonant transition of ion taken from NIST database in angular frequency units 
         (ex, S1/2 to P1/2 and S1/2 to P3/2 for 40Ca+)
     P_opt = total optical power of tweezer laser beam
+    omega_res = angular frequency of resonant transition, also based off NIST data
     beam_waists = beamwaist of the tweezer laser beam
     given its frequency and the NA of our system or from measurement
     '''
@@ -53,6 +55,7 @@ def scattering(omega_tweezer,linewidths,omega_res,P_opt,beamwaists):
     linewidths = linewidth of the given resonant transition taken from NIST database in angular frequency units 
         (ex, S1/2 to P1/2 and S1/2 to P3/2 for 40Ca+)
     P_opt = total optical power of tweezer laser beam
+    omega_res = angular frequency of resonant transition, also based off NIST data
     beam_waists = beamwaist of the tweezer laser beam
     given its frequency and the NA of our system or from measurement
     '''
@@ -69,6 +72,7 @@ def scatteringRWA(omegatweezer,linewidths,omegares,Popt,beamwaists):
     Detuning = omegatweezer - omegaresonance where omegaresonance is the angular frequency corresponding to linewidth
     counterrotating = omegatweezer+omegaresonance 
     Popt = total optical power of tweezer laser beam
+    omega_res = angular frequency of resonant transition, also based off NIST data
     beamwaists = beamwaist of the tweezer laser beam given its frequency and the NA of our system'''
     return (3*c**2/(hbar * (omegatweezer**3))) * ((linewidths/(omegares - omegatweezer))**(2)) * Popt/(beamwaists**2)
 
