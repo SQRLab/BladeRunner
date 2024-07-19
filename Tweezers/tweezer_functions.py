@@ -14,15 +14,15 @@ pi = np.pi
 def potential(omega_tweezer,linewidths,omega_res,P_opt,beam_waists):
     '''
     Find the potential of the optical tweezers beam for
-    the given set of parameters -- without RWA
+    the given set of parameters at r=0 and z=0 -- without RWA
 
 
     omega_tweezer = angular frequency of tweezer laser beam
-    linewidths = linewidth of the given resonant transition
-        (ex, S1/2 to D5/2)
+    linewidths = linewidth of the given resonant transition of ion taken from NIST database in angular frequency units 
+        (ex, S1/2 to P1/2 and S1/2 to P3/2 for 40Ca+)
     P_opt = total optical power of tweezer laser beam
     beam_waists = beamwaist of the tweezer laser beam
-    given its frequency and the NA of our system
+    given its frequency and the NA of our system or from measurement
     '''
 
     return (-3*pi*(c**2)/omega_tweezer**3) * (linewidths/((omega_res - omega_tweezer)) +
@@ -32,39 +32,40 @@ def potential(omega_tweezer,linewidths,omega_res,P_opt,beam_waists):
 def potentialRWA(omega_tweezer,linewidths,omega_res,P_opt,beam_waists):
     '''
     Find the potential of the optical tweezers beam for the
-    given set of parameters -- Using RWA
+    given set of parameters at r=0 and z=0 -- Using RWA
 
 
     omega_tweezer = angular frequency of tweezer laser beam
-    linewidths = linewidth of the given resonant transition
-        (ex, S1/2 to D5/2)
+    linewidths = linewidth of the given resonant transition of ion taken from NIST database in angular frequency units 
+        (ex, S1/2 to P1/2 and S1/2 to P3/2 for 40Ca+)
     P_opt = total optical power of tweezer laser beam
     beam_waists = beamwaist of the tweezer laser beam
-    given its frequency and the NA of the system
+    given its frequency and the NA of our system or from measurement
     '''
     return (3*c**2/omega_tweezer**3) * (linewidths/(omega_res - omega_tweezer)) * P_opt/(beam_waists**2)
 
 
 def scattering(omega_tweezer,linewidths,omega_res,P_opt,beamwaists):
     '''
-    Find the scattering of the optical tweezers beam off of a given resonance
+    Find the scattering of the optical tweezers beam (at r=0 and z=0) off of a given resonance
     for the given set of parameters -- without RWA
     omega_tweezer = angular frequency of tweezer laser beam
-    linewidths = linewidth of the given resonant transition
-        (ex, S1/2 to D5/2)
+    linewidths = linewidth of the given resonant transition taken from NIST database in angular frequency units 
+        (ex, S1/2 to P1/2 and S1/2 to P3/2 for 40Ca+)
     P_opt = total optical power of tweezer laser beam
     beam_waists = beamwaist of the tweezer laser beam
-    given its frequency and the NA of our system
+    given its frequency and the NA of our system or from measurement
     '''
     return ((3*pi*(c**2))/(hbar * (omega_tweezer**3))) *((omega_tweezer/omegares)**3)* (((linewidths/(omega_res - omega_tweezer))+
                                                                             (linewidths/(omegares + omega_tweezer)))**2) * ((P_opt)/(beam_waists**2))
 
 
 def scatteringRWA(omegatweezer,linewidths,omegares,Popt,beamwaists):
-    '''Find the scattering of the optical tweezers beam off of a given resonance
+    '''Find the scattering of the optical tweezers beam (at r=0 and z=0)off of a given resonance
     for the given set of parameters -- Using RWA
     omegatweezer = angular frequency of tweezer laser beam
-    linewidths = linewidth of the given resonant transition (ex, S1/2 to D5/2)
+    linewidths = linewidth of the given resonant transition, taken from NIST database in angular frequency units 
+        (ex, S1/2 to P1/2 and S1/2 to P3/2 for 40Ca+)
     Detuning = omegatweezer - omegaresonance where omegaresonance is the angular frequency corresponding to linewidth
     counterrotating = omegatweezer+omegaresonance 
     Popt = total optical power of tweezer laser beam
@@ -72,57 +73,57 @@ def scatteringRWA(omegatweezer,linewidths,omegares,Popt,beamwaists):
     return (3*c**2/(hbar * (omegatweezer**3))) * ((linewidths/(omegares - omegatweezer))**(2)) * Popt/(beamwaists**2)
 
 
-def epsilon(d,wx,m):
-    """
-    Dimensionless parameter describing characteristic energy(?) scales of our ion chain
-    """
 
-    return ((e**2)/(4*pi*eps0*(d**3)*m*(wx**2)))**(1/2)
-
-def v(wx,wxt):
+def omega_radial_tweezer(U,beam_waists,m):
     """
-    Dimensionless ratio of radial trapping frequency of tweezer /rf trap
-    """
-
-    return wxt/wx
-
-def omega_radial(U,beam_waists,m):
-    """
-    Calculating the radial tweezer trap frequency
-    given the tweezer potential (or trap depth) U,
+    Calculating the radial tweezer trap frequency (perpendicular to laser propogation) at r=0 and z=0
+    given the tweezer potential U [J],
     the beam waist of the tweezer laser beam,
     and the mass of the ion
 
-    U = potential created from the tweezer laser beam
+    U = potential created from the tweezer laser beam, from potential function
     beam_waists = beam_waists = beamwaist of the tweezer laser beam
     m = mass of ion
     """
     return ((abs(U) * 4) / (m * (beam_waists)**2))**(1/2)
 
-def omega_axial(U,beam_waists,tweezer_wavelength,m):
+def omega_axial_tweezer(U,beam_waists,tweezer_wavelength,m):
     """
-    Calculating the radial tweezer trap frequency
-       given the tweezer potential (or trap depth) U,
-       the beam waist of the tweezer laser beam,
-       the wavelength of the tweezer laser beam,
-       and the mass of the ion
+     Calculating the axial tweezer trap frequency (along laser propogation) at r=0 and z=0
+    given the tweezer potential U [J],
+    the beam waist of the tweezer laser beam,
+    and the mass of the ion
 
-       U = potential created from the tweezer laser beam
+       U = potential created from the tweezer laser beam, from potential function
        beam_waists = beam_waists = beamwaist of the tweezer laser beam
        tweezer_wavelength = wavelgth of the tweezer laser beam
        m = mass of ion
        """
     return ((2*abs(U)/m)**(1/2)) * 1/((pi*(beam_waists**2)/tweezer_wavelength))
 
-def mode_calc_r(m,omega_r,omega_a):
-    N = len(omega_r)
+def mode_calc_r(m,omega_r_combined,omega_a):
+    
+    """
+    
+    Hessian for ions in a pseudo-potential
+    
+    Inputs:
+    m -- mass of ion
+    omega_r_combined -- combined radial frequency taking into account the rf potential as well as the tweezer potentials. 
+                will look like array where each entry for untweezed ion is the rf radial frequency and each entry for the
+                tweezed ions is sqrt(omega_tweezer^2 + omega_r_rf^2)
+    omega_a -- axial trapping frequency created by rf potential
+    
+    
+    """
+    N = len(omega_r_combined)
     A = np.zeros((N, N))
     l = lengthScale(omega_a)
     ueq = calcPositions(N)*l
     coloumb = ((e**2) / (4 * pi * eps0))
     masses = np.array([m for _ in range(N)])
     for i in range(N):
-        A[i][i] = (masses[i] * omega_r[i]**2 - coloumb * sum(1 / (ueq[i] - ueq[m])**3 for m in range(0, i))
+        A[i][i] = (masses[i] * omega_r_combined[i]**2 - coloumb * sum(1 / (ueq[i] - ueq[m])**3 for m in range(0, i))
            - coloumb * sum(1 / (ueq[m] - ueq[i])**3 for m in range(i + 1, N))) * masses[i]
         for j in range(0, i):
             A[i][j] = (1/(ueq[i]-ueq[j])**3) * np.sqrt(masses[i])*np.sqrt(masses[j])*(coloumb)
@@ -141,7 +142,21 @@ def mode_calc_r(m,omega_r,omega_a):
         modes.append((f, vec))
     return modes
 
-def mode_calc_a(m,omega_a):
+def mode_calc_a(m,omega_a,omega_a_combined):
+        """
+    
+    Hessian for ions in a pseudo-potential
+    
+    Inputs:
+    m -- mass of ion
+    omega_a_combined -- combined radial frequency taking into account the rf potential as well as the tweezer potentials. 
+                will look like array where each entry for untweezed ion is the rf radial frequency and each entry for the
+                tweezed ions is sqrt(omega_tweezer^2 + omega_a_rf^2)
+    omega_a -- axial trapping frequency created by rf potential
+    
+    
+    """
+    
     N = len(omega_a)
     A = np.zeros((N, N))
     l = lengthScale(omega_a)
@@ -149,7 +164,7 @@ def mode_calc_a(m,omega_a):
     coloumb = ((e**2) / (4 * pi * eps0))
     masses = np.array([m for _ in range(N)])
     for i in range(N):
-        A[i][i] = (masses[i] * omega_a[i]**2 + coloumb * sum(2 / (ueq[i] - ueq[m])**3 for m in range(0, i))
+        A[i][i] = (masses[i] * omega_a_combined[i]**2 + coloumb * sum(2 / (ueq[i] - ueq[m])**3 for m in range(0, i))
            + coloumb * sum(2 / (ueq[m] - ueq[i])**3 for m in range(i + 1, N))) * masses[i]
         for j in range(0, i):
             A[i][j] = (-2/(ueq[i]-ueq[j])**3) * np.sqrt(masses[i])*np.sqrt(masses[j])*(coloumb)
