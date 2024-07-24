@@ -11,7 +11,7 @@ hbar = constants.hbar
 pi = np.pi
 
 
-def potential(omega_tweezer,linewidths,omega_res,P_opt,beam_waists):
+def potential(omega_tweezer,linewidths,omega_res,P_opt,beam_waist):
     '''
     Find the potential of the optical tweezers beam for
     the given set of parameters at r=0 and z=0 -- without RWA
@@ -19,35 +19,42 @@ def potential(omega_tweezer,linewidths,omega_res,P_opt,beam_waists):
 
     omega_tweezer = angular frequency of tweezer laser beam
     linewidths = linewidth of the given resonant transition of ion taken from NIST database in angular frequency units 
-        (ex, S1/2 to P1/2 and S1/2 to P3/2 for 40Ca+)
+        (ex, S1/2 to P1/2 and S1/2 to P3/2 for 40Ca+), this is a list/array of some form with all relevent transitions
     P_opt = total optical power of tweezer laser beam
     omega_res = angular frequency of resonant transition, also based off NIST data
     beam_waists = beamwaist of the tweezer laser beam
     given its frequency and the NA of our system or from measurement
     '''
+    p = []
+    for i in range(len(linewidths)): 
+        p.append( (-3*P_opt*(c**2)/((omega_res[i]**3)*(beam_waist**2))) * (linewidths[i]/((omega_res[i] - omega_tweezer)) +
+                                          linewidths[i]/(omega_res[i] + omega_tweezer)) ) 
+    pot = sum(p)
+    return pot
 
-    return (-3*pi*(c**2)/omega_tweezer**3) * (linewidths/((omega_res - omega_tweezer)) +
-                                          linewidths/(omega_res + omega_tweezer)) * ((P_opt)/(beam_waists**2))
 
-
-def potentialRWA(omega_tweezer,linewidths,omega_res,P_opt,beam_waists):
+def potentialRWA(omega_tweezer,linewidths,omega_res,P_opt,beam_waist):
     '''
-    Find the potential of the optical tweezers beam for the
-    given set of parameters at r=0 and z=0 -- Using RWA
+    Find the potential of the optical tweezers beam for
+    the given set of parameters at r=0 and z=0 -- with RWA
 
 
     omega_tweezer = angular frequency of tweezer laser beam
     linewidths = linewidth of the given resonant transition of ion taken from NIST database in angular frequency units 
-        (ex, S1/2 to P1/2 and S1/2 to P3/2 for 40Ca+)
+        (ex, S1/2 to P1/2 and S1/2 to P3/2 for 40Ca+), this is a list/array of some form with all relevent transitions
     P_opt = total optical power of tweezer laser beam
     omega_res = angular frequency of resonant transition, also based off NIST data
     beam_waists = beamwaist of the tweezer laser beam
     given its frequency and the NA of our system or from measurement
     '''
-    return (3*c**2/omega_tweezer**3) * (linewidths/(omega_res - omega_tweezer)) * P_opt/(beam_waists**2)
+    p = []
+    for i in range(len(linewidths)): 
+        p.append( (-3*P_opt*(c**2)/((omega_res[i]**3)*(beam_waist**2))) * (linewidths[i]/((omega_res[i] - omega_tweezer)))  ) 
+    pot = sum(p)
+    return pot
 
 
-def scattering(omega_tweezer,linewidths,omega_res,P_opt,beamwaists):
+def scattering(omega_tweezer,linewidths,omega_res,P_opt,beam_waist):
     '''
     Find the scattering of the optical tweezers beam (at r=0 and z=0) off of a given resonance
     for the given set of parameters -- without RWA
@@ -59,22 +66,34 @@ def scattering(omega_tweezer,linewidths,omega_res,P_opt,beamwaists):
     beam_waists = beamwaist of the tweezer laser beam
     given its frequency and the NA of our system or from measurement
     '''
-    return ((3*pi*(c**2))/(hbar * (omega_tweezer**3))) *((omega_tweezer/omegares)**3)* (((linewidths/(omega_res - omega_tweezer))+
-                                                                            (linewidths/(omegares + omega_tweezer)))**2) * ((P_opt)/(beam_waists**2))
+    s = []
+    for i in range(len(linewidths)):
+        s.append(((3*(c**2)*P_opt)/(hbar *pi* (omega_res[i]**3)*(beam_waist**2))) *((omega_tweezer/omegares[i])**3)* (((linewidths[i]/(omega_res[i] - omega_tweezer))+
+                                                                            (linewidths[i]/(omegares[i] + omega_tweezer)))**2) )
+    scat = sum(s)
+    return scat
 
 
-def scatteringRWA(omegatweezer,linewidths,omegares,Popt,beamwaists):
-    '''Find the scattering of the optical tweezers beam (at r=0 and z=0)off of a given resonance
-    for the given set of parameters -- Using RWA
-    omegatweezer = angular frequency of tweezer laser beam
-    linewidths = linewidth of the given resonant transition, taken from NIST database in angular frequency units 
+def scatteringRWA(omega_tweezer,linewidths,omega_res,P_opt,beam_waist):
+    '''
+    Find the scattering of the optical tweezers beam (at r=0 and z=0) off of a given resonance
+    for the given set of parameters -- with RWA
+    omega_tweezer = angular frequency of tweezer laser beam
+    linewidths = linewidth of the given resonant transition taken from NIST database in angular frequency units 
         (ex, S1/2 to P1/2 and S1/2 to P3/2 for 40Ca+)
-    Detuning = omegatweezer - omegaresonance where omegaresonance is the angular frequency corresponding to linewidth
-    counterrotating = omegatweezer+omegaresonance 
-    Popt = total optical power of tweezer laser beam
+    P_opt = total optical power of tweezer laser beam
     omega_res = angular frequency of resonant transition, also based off NIST data
-    beamwaists = beamwaist of the tweezer laser beam given its frequency and the NA of our system'''
-    return (3*c**2/(hbar * (omegatweezer**3))) * ((linewidths/(omegares - omegatweezer))**(2)) * Popt/(beamwaists**2)
+    beam_waists = beamwaist of the tweezer laser beam
+    given its frequency and the NA of our system or from measurement
+    '''
+    s = []
+    for i in range(len(linewidths)):
+        s.append( (3*P_opt*(c**2)/(hbar *pi* (omega_res[i]**3)*(beam_waist**2))) *((omega_tweezer/omega_res[i])**3) *((linewidths[i]/(omega_res[i] - omega_tweezer))**(2)) 
+        )
+    scat = sum(s)
+    return scat
+
+
 
 
 
