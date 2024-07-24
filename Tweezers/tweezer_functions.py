@@ -78,7 +78,7 @@ def scatteringRWA(omegatweezer,linewidths,omegares,Popt,beamwaists):
 
 
 
-def omega_radial_tweezer(U,beam_waists,m):
+def omega_tweezer_r(U,beam_waists,m):
     """
     Calculating the radial tweezer trap frequency (perpendicular to laser propogation) at r=0 and z=0
     given the tweezer potential U [J],
@@ -91,7 +91,7 @@ def omega_radial_tweezer(U,beam_waists,m):
     """
     return ((abs(U) * 4) / (m * (beam_waists)**2))**(1/2)
 
-def omega_axial_tweezer(U,beam_waists,tweezer_wavelength,m):
+def omega_tweezer_a(U,beam_waists,tweezer_wavelength,m):
     """
      Calculating the axial tweezer trap frequency (along laser propogation) at r=0 and z=0
     given the tweezer potential U [J],
@@ -147,7 +147,7 @@ def mode_calc_r(m,omega_r_combined,omega_a):
     return modes
 
 def mode_calc_a(m,omega_a,omega_a_combined):
-        """
+    """
     
     Hessian for ions in a pseudo-potential
     
@@ -160,7 +160,6 @@ def mode_calc_a(m,omega_a,omega_a_combined):
     
     
     """
-    
     N = len(omega_a)
     A = np.zeros((N, N))
     l = lengthScale(omega_a)
