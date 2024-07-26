@@ -253,8 +253,15 @@ def individual_freqs_to_mode_vectors(N,tweezed_ions,omega_tweezer_r,omega_tweeze
     return mode_calc_r(m,omega_r_combined,omega_a)
 
 
+def tweezer_optical_potential_to_trap_frequency(omega_tweezer,linewidths,omega_res,P_opt,beam_waist,m):
+    U = potential(omega_tweezer,linewidths,omega_res,P_opt,beam_waist)
+    w_tweezer_r =  omega_tweezer_r(U,beam_waist,m)
+    w_tweezer_a = omega_tweezer_a(U,beam_waist,tweezer_wavelength,m)
+    return np.array([w_tweezer_r,w_tweezer_a])
 
-def physical_params_to_mode_vectors(N,tweezed_ions,omega_tweezer,tweezer_wavelength,linewidths,omega_res,w_rf_a,w_rf_r,P_opt,beam_waist,m):
+
+
+def physical_params_to_radial_mode_vectors(N,tweezed_ions,omega_tweezer,tweezer_wavelength,linewidths,omega_res,w_rf_a,w_rf_r,P_opt,beam_waist,m):
     U = potential(omega_tweezer,linewidths,omega_res,P_opt,beam_waist)
     w_tweezer_r =  omega_tweezer_r(U,beam_waist,m)
     w_tweezer_a = omega_tweezer_a(U,beam_waist,tweezer_wavelength,m)
