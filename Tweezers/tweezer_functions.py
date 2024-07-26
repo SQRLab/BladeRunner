@@ -97,7 +97,7 @@ def scatteringRWA(omega_tweezer,linewidths,omega_res,P_opt,beam_waist):
 
 
 
-def omega_tweezer_r(U,beam_waists,m):
+def omega_tweezer_r(U,beam_waist,m):
     """
     Calculating the radial tweezer trap frequency (perpendicular to laser propogation) at r=0 and z=0
     given the tweezer potential U [J],
@@ -108,9 +108,9 @@ def omega_tweezer_r(U,beam_waists,m):
     beam_waists = beam_waists = beamwaist of the tweezer laser beam
     m = mass of ion
     """
-    return ((abs(U) * 4) / (m * (beam_waists)**2))**(1/2)
+    return ((abs(U) * 4) / (m * (beam_waist)**2))**(1/2)
 
-def omega_tweezer_a(U,beam_waists,tweezer_wavelength,m):
+def omega_tweezer_a(U,beam_waist,tweezer_wavelength,m):
     """
      Calculating the axial tweezer trap frequency (along laser propogation) at r=0 and z=0
     given the tweezer potential U [J],
@@ -122,7 +122,39 @@ def omega_tweezer_a(U,beam_waists,tweezer_wavelength,m):
        tweezer_wavelength = wavelgth of the tweezer laser beam
        m = mass of ion
        """
-    return ((2*abs(U)/m)**(1/2)) * 1/((pi*(beam_waists**2)/tweezer_wavelength))
+    return ((2*abs(U)/m)**(1/2)) * 1/((pi*(beam_waist**2)/tweezer_wavelength))
+
+
+def combined_frequencies(N,tweezed_ions,omega_tweezer_r,omega_tweezer_a,omega_rf_r,omega_rf_a):
+
+
+    omega_tweezer_r = np.zeros(N)
+    omega_tweezer_a = np.zeros(N)
+    omega_tweezer_r[tweezed_ions] = tweezer_strength_r
+    omega_tweezer_a[tweezed_ions] = tweezer_strength_a
+
+    omega_rf_r = omega_rf_r * np.ones(N) 
+    omega_rf_a = omega_a * np.ones(N)
+
+    tweezer_r_to_rf_ratio = tweezer_strength_r / omega_rf_r
+    tweezer_r_to_axial_ratio = tweezer_strength_r / omega_a
+    tweezer_a_to_rf_ratio = tweezer_strength_a / omega_a
+
+    omega_combined_rr = np.sqrt(omega_rf_r**2 + omega_tweezer_r**2)
+    omega_combined_ra = np.sqrt(omega_rf_r**2 + omega_tweezer_a)
+    omega_combined_ar = np.sqrt(omega_a**2 + omega_tweezer_r**2)
+    
+    return np.array([omega_combined_rr,omega_combined_ra,omega_combined_ar])
+
+def trapping_ratios(omega_tweezer_r,omega_tweezer_a,omega_rf_r,omega_rf_a):
+    
+    tweezer_r_to_rf_ratio = omega_tweezer_r / omega_rf_r
+    tweezer_r_to_axial_ratio = omega_tweezer_r / omega_rf_a
+    tweezer_a_to_rf_ratio = omega_tweezer_a / omega_rf_a
+    
+    return np.array([tweezer_r_to_rf_ratio,tweezer_r_to_axial_ratio])
+
+
 
 def mode_calc_r(m,omega_r_combined,omega_a):
     
