@@ -244,4 +244,18 @@ def mode_calc_a(m,omega_a,omega_a_combined):
         modes.append((f, vec))
     return modes
 
+def combined_freqs_to_mode_vectors(N,tweezed_ions,omega_tweezer_r,omega_tweezer_a,omega_rf_r,omega_rf_a):
+
+
+
+
+    combined_freqs = combined_frequencies(N,tweezed_ions,omega_tweezer_r,omega_tweezer_a,omega_rf_r,omega_rf_a)
+
+
+    omega_r_combined = combined_freqs[0]
+    omega_a = omega_rf_a
+
+    return mode_calc_r(m,omega_r_combined,omega_a)
+
+
 
