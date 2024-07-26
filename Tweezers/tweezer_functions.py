@@ -126,6 +126,11 @@ def omega_tweezer_a(U,beam_waist,tweezer_wavelength,m):
 
 
 def combined_frequencies(N,tweezed_ions,omega_tweezer_r,omega_tweezer_a,omega_rf_r,omega_rf_a):
+    """
+    
+    """
+    
+    
 
 
     omega_tweezer_r = np.zeros(N)
