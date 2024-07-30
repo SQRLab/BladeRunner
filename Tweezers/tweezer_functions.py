@@ -27,7 +27,7 @@ def potential(omega_tweezer,linewidths,omega_res,P_opt,beam_waist):
     '''
     p = []
     for i in range(len(linewidths)): 
-        p.append( (-3*P_opt*(c**2)/((omega_res[i]**3)*(beam_waist**2))) * (linewidths[i]/((omega_res[i] - omega_tweezer)) +
+        p.append( (-3.*P_opt*(c**2.)/((omega_res[i]**3.)*(beam_waist**2.))) * (linewidths[i]/((omega_res[i] - omega_tweezer)) +
                                           linewidths[i]/(omega_res[i] + omega_tweezer)) ) 
     pot = sum(p)
     return pot
@@ -287,12 +287,12 @@ def individual_freqs_to_mode_vectors(N,tweezed_ions,w_tweezer_r,w_tweezer_a,w_rf
     return mode_calc_r(m,omega_r_combined,omega_a)
 
 
-def tweezer_optical_potential_to_trap_frequency(omega_tweezer,linewidths,omega_res,P_opt,beam_waist,m):
+def tweezer_optical_potential_to_trap_frequency(tweezer_wavelength,linewidths,omega_res,P_opt,beam_waist,m):
     """
     takes in physical parameters of calcium ion and tweezer beam and outputs expected tweezer trap frequency
     
     Inputs:
-    omega_tweezer = angular frequency of tweezer laser beam [2*Pi x Hz]
+    tweezer_wavelength = tweezer wavelength [m]
     linewidths = linewidth of the given resonant transition taken from NIST database in angular frequency units 
         (ex, S1/2 to P1/2 and S1/2 to P3/2 for 40Ca+)
     P_opt = total optical power of tweezer laser beam
@@ -304,7 +304,7 @@ def tweezer_optical_potential_to_trap_frequency(omega_tweezer,linewidths,omega_r
     array of radial and axial tweezer trap frequencies [2*Pi x Hz]
     
     """
-    tweezer_wavelength = 2*pi*c/omega_tweezer
+    omega_tweezer = 2*pi*c/tweezer_wavelength
     
     U = potential(omega_tweezer,linewidths,omega_res,P_opt,beam_waist)
     w_tweezer_r =  omega_tweezer_r(U,beam_waist,m)
@@ -313,13 +313,13 @@ def tweezer_optical_potential_to_trap_frequency(omega_tweezer,linewidths,omega_r
 
 
 
-def physical_params_to_radial_mode_vectors(N,tweezed_ions,omega_tweezer,tweezer_wavelength,linewidths,omega_res,w_rf_a,w_rf_r,P_opt,beam_waist,m):
+def physical_params_to_radial_mode_vectors(N,tweezed_ions,tweezer_wavelength,linewidths,omega_res,w_rf_a,w_rf_r,P_opt,beam_waist,m):
     """
     takes in physical parameters of tweezer beam and calcium ion as well as rf 
     trapping parameters to output combined radial modes
     
     Inputs:
-    omega_tweezer = angular frequency of tweezer laser beam [2*Pi x Hz]
+    tweezer_wavelength = tweezer wavelength [m]
     linewidths = linewidth of the given resonant transition taken from NIST database in angular frequency units 
         (ex, S1/2 to P1/2 and S1/2 to P3/2 for 40Ca+)
     P_opt = total optical power of tweezer laser beam
@@ -334,10 +334,11 @@ def physical_params_to_radial_mode_vectors(N,tweezed_ions,omega_tweezer,tweezer_
     w_rf_a = axial rf trapping frequency [2*Pi x Hz]
     
     outputs:
-    modes from mode_calc_r
+    modes from mode_calc_r, frequencies in Hz (not angular)
     
     """
    
+    omega_tweezer = 2*pi*c/tweezer_wavelength
     
     U = potential(omega_tweezer,linewidths,omega_res,P_opt,beam_waist)
     w_tweezer_r =  omega_tweezer_r(U,beam_waist,m)
