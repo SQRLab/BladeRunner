@@ -68,8 +68,8 @@ def scattering(omega_tweezer,linewidths,omega_res,P_opt,beam_waist):
     '''
     s = []
     for i in range(len(linewidths)):
-        s.append(((3*(c**2)*P_opt)/(hbar *pi* (omega_res[i]**3)*(beam_waist**2))) *((omega_tweezer/omegares[i])**3)* (((linewidths[i]/(omega_res[i] - omega_tweezer))+
-                                                                            (linewidths[i]/(omegares[i] + omega_tweezer)))**2) )
+        s.append(((3*(c**2)*P_opt)/(hbar *pi* (omega_res[i]**3)*(beam_waist**2))) *((omega_tweezer/omega_res[i])**3)* (((linewidths[i]/(omega_res[i] - omega_tweezer))+
+                                                                            (linewidths[i]/(omega_res[i] + omega_tweezer)))**2) )
     scat = sum(s)
     return scat
 
@@ -304,6 +304,7 @@ def tweezer_optical_potential_to_trap_frequency(omega_tweezer,linewidths,omega_r
     array of radial and axial tweezer trap frequencies [2*Pi x Hz]
     
     """
+    tweezer_wavelength = 2*pi*c/omega_tweezer
     
     U = potential(omega_tweezer,linewidths,omega_res,P_opt,beam_waist)
     w_tweezer_r =  omega_tweezer_r(U,beam_waist,m)
@@ -336,6 +337,8 @@ def physical_params_to_radial_mode_vectors(N,tweezed_ions,omega_tweezer,tweezer_
     modes from mode_calc_r
     
     """
+   
+    
     U = potential(omega_tweezer,linewidths,omega_res,P_opt,beam_waist)
     w_tweezer_r =  omega_tweezer_r(U,beam_waist,m)
     w_tweezer_a = omega_tweezer_a(U,beam_waist,tweezer_wavelength,m)
