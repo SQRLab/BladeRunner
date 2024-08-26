@@ -93,6 +93,62 @@ def scatteringRWA(omega_tweezer,linewidths,omega_res,P_opt,beam_waist):
     scat = sum(s)
     return scat
 
+def rayleigh_length(FWHM,lambda_beam):
+    """
+    calculate the rayleigh length of a beam
+    inputs: 
+    
+    lambda_beam -- wavelength of the beam
+    
+    output:
+    rayleigh length
+    
+    """
+    
+    return (pi * FWHM**2)/lambda_beam
+
+def beam_propogation(FWHM,rayleigh_length,z_pos):
+    """
+    calculate the beam propogation 
+    inputs:
+    FWHM --  the full width half max of a gaussian beam
+    rayleigh_length -- calculated from rayleigh_length function
+    z_pos -- list of z positions
+    
+    output:
+    beam propogation as a function of z
+    
+    
+    """
+    
+    return FWHM * np.sqrt(1 + (z_pos/rayleigh_length)**2)
+
+def intensity(P0,FWYM,beam_propogation,r):
+    """
+    calculate the intensity of the beam at a given (r,z)
+    inputs:
+    FWHM -- the full width half max of a gaussian beam
+    beam_propogation -- beam propogation as a function of z
+    
+    """
+    
+    return (2*P0/pi*FWHM**2) * (FWHM / beam_propogation)**2 * np.exp(-2*r**2 / beam_propogation**2)
+
+
+def potential_position_dependent(omega_res,linewidths,omega_tweezer,intensity):
+    """
+    Calculate the potential of the optical tweezer beam at a specific position (r,z)
+    
+    
+    
+    """
+    p = []
+    for i in range(len(linewidths)): 
+        p.append( (-3.*pi*(c**2.)/(2*(omega_res[i]**3.))) \
+                                       * (linewidths[i]/((omega_res[i] - omega_tweezer)) +
+                                          linewidths[i]/(omega_res[i] + omega_tweezer)) * intensity )
+    pot = sum(p)
+    return pot
 
 
 
