@@ -123,7 +123,7 @@ def beam_propogation(FWHM,rayleigh_length,z_pos):
     
     return FWHM * np.sqrt(1 + (z_pos/rayleigh_length)**2)
 
-def intensity(P0,FWYM,beam_propogation,r):
+def intensity(P0,FWHM,beam_propogation,r):
     """
     calculate the intensity of the beam at a given (r,z)
     inputs:
@@ -160,7 +160,7 @@ def omega_tweezer_r(U,beam_waist,m):
     the beam waist of the tweezer laser beam,
     and the mass of the ion
 
-    U = potential created from the tweezer laser beam, from potential function
+    U = potential created from the tweezer laser beam, from potential function at r=0 and z=0
     beam_waists = beam_waists = beamwaist of the tweezer laser beam
     m = mass of ion
     """
