@@ -97,11 +97,11 @@ def rayleigh_length(FWHM,lambda_beam):
     """
     calculate the rayleigh length of a beam
     inputs: 
-    
-    lambda_beam -- wavelength of the beam
+    FWHM in m 
+    lambda_beam -- wavelength of the beam in meters
     
     output:
-    rayleigh length
+    rayleigh length in meters
     
     """
     
@@ -130,9 +130,12 @@ def intensity(P0,FWHM,beam_propogation,r):
     FWHM -- the full width half max of a gaussian beam
     beam_propogation -- beam propogation as a function of z
     
+    returns:
+    intensity in W/m^2
+    
     """
     
-    return (2*P0/pi*FWHM**2) * (FWHM / beam_propogation)**2 * np.exp(-2*r**2 / beam_propogation**2)
+    return (2*P0/(pi*FWHM**2)) * (FWHM / beam_propogation)**2 * np.exp(-2*r**2 / beam_propogation**2)
 
 
 def potential_position_dependent(omega_res,linewidths,omega_tweezer,intensity):
