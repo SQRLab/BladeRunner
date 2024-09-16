@@ -1,0 +1,225 @@
+(* Content-type: application/vnd.wolfram.mathematica *)
+
+(*** Wolfram Notebook File ***)
+(* http://www.wolfram.com/nb *)
+
+(* CreatedBy='Mathematica 13.3' *)
+
+(*CacheID: 234*)
+(* Internal cache information:
+NotebookFileLineBreakTest
+NotebookFileLineBreakTest
+NotebookDataPosition[       158,          7]
+NotebookDataLength[      8085,        217]
+NotebookOptionsPosition[      7393,        196]
+NotebookOutlinePosition[      7786,        212]
+CellTagsIndexPosition[      7743,        209]
+WindowFrame->Normal*)
+
+(* Beginning of Notebook Content *)
+Notebook[{
+
+Cell[CellGroupData[{
+Cell["Toroid calculation -- Large core (T184-17)", "Title",
+ CellChangeTimes->{{3.9297087869559517`*^9, 3.92970879628233*^9}, {
+  3.929708850124064*^9, 
+  3.9297088559234753`*^9}},ExpressionUUID->"fcaed06a-f9a4-4afc-9273-\
+b7a3583e0cc4"],
+
+Cell["\<\
+Methodology behind measurements in this notebook:
+
+A. Inherent inductance and capacitance of the toroid
+1. Calculate expected L and f just from geometry and number of turns.
+2. Measure reflection of main coil on VNA across various capacitors.
+3. Fit to quadratic, find actual L and C from that
+L = L_calc + L2  = 5.6 uH + 1.7 +- 0.1 uH , C2 = 10.8 +- 1.4 pF
+
+B: Trap capacitance
+1. Hook up resonator to pairs of feedthroughs from chamber.  Feedthroughs are \
+connected to: nothing, endcaps, or blades (either opp or neighbor blades)
+2. Measure resonant f across each kind of feedthrough pair
+3. Change number of turns, characterize that toroid and measure across each \
+feedthrough pair while confirming the same inductor relationship.
+4. Hook up toroid across intended blades, find trap capacitance from that. 
+Neighboring blades: 19 MHz
+Diagonal blades: 20 MHz
+Endcaps: 20 MHz
+Unconnected + electrode: 22-23 MHz
+Unconnected: 22-24 MHz
+C_trap: 28.8 pF
+
+\
+\>", "Text",
+ CellChangeTimes->{{3.929803320671041*^9, 3.929803448327166*^9}, {
+  3.929803484842864*^9, 
+  3.929803599860196*^9}},ExpressionUUID->"952f4ccd-87eb-4c42-bd9b-\
+1079b183c7a8"],
+
+Cell[CellGroupData[{
+
+Cell[BoxData[{
+ RowBox[{
+  RowBox[{
+   RowBox[{"u0", " ", "=", " ", 
+    RowBox[{"1.25663706212", " ", 
+     SuperscriptBox["10", 
+      RowBox[{"-", "6"}]]}]}], " ", ";"}], " ", 
+  RowBox[{"(*", 
+   RowBox[{"vacuum", " ", "permeability"}], "*)"}]}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{
+   RowBox[{"ui", " ", "=", " ", "4"}], ";"}], " ", 
+  RowBox[{"(*", 
+   RowBox[{
+   "relative", " ", "permeability", " ", "of", " ", "the", " ", "core"}], 
+   "*)"}]}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{
+   RowBox[{"h", " ", "=", " ", 
+    RowBox[{"18.3", " ", 
+     SuperscriptBox["10", 
+      RowBox[{"-", "3"}]]}]}], " ", ";"}], " ", 
+  RowBox[{"(*", 
+   RowBox[{
+    RowBox[{"height", " ", "of", " ", "toroid"}], ",", "m"}], 
+   "*)"}]}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{
+   RowBox[{"ro", " ", "=", " ", 
+    RowBox[{
+     FractionBox["47", "2"], " ", 
+     SuperscriptBox["10", 
+      RowBox[{"-", "3"}]]}]}], ";"}], 
+  RowBox[{"(*", 
+   RowBox[{
+    RowBox[{"outer", " ", "diameter", " ", "of", " ", "toroid"}], ",", "m"}], 
+   "*)"}]}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{
+   RowBox[{"ri", " ", "=", " ", 
+    RowBox[{
+     FractionBox["24", "2"], " ", 
+     SuperscriptBox["10", 
+      RowBox[{"-", "3"}]]}]}], ";"}], " ", 
+  RowBox[{"(*", 
+   RowBox[{
+    RowBox[{"inner", " ", "diameter", " ", "of", " ", "toroid"}], ",", "m"}], 
+   "*)"}]}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{
+   RowBox[{"n", " ", "=", " ", "10"}], ";"}], 
+  RowBox[{"(*", 
+   RowBox[{"number", " ", "of", " ", "loops", " ", "on", " ", "toroid"}], 
+   "*)"}]}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{
+   RowBox[{"L", " ", "=", " ", 
+    RowBox[{"u0", " ", "ui", " ", "h", " ", 
+     FractionBox[
+      SuperscriptBox["n", "2"], 
+      RowBox[{"2", " ", "\[Pi]"}]], " ", 
+     RowBox[{"Log", "[", 
+      RowBox[{"ro", "/", "ri"}], "]"}]}]}], ";"}], "  ", 
+  RowBox[{"(*", "H", "*)"}]}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{
+   RowBox[{"LInherent", " ", "=", " ", 
+    RowBox[{"1.7", "*", 
+     SuperscriptBox["10", 
+      RowBox[{"-", "6"}]]}]}], ";"}], " ", 
+  RowBox[{"(*", "H", "*)"}]}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{
+   RowBox[{"CTrap", " ", "=", " ", 
+    RowBox[{"28.8", " ", 
+     SuperscriptBox["10", 
+      RowBox[{"-", "12"}]]}]}], " ", ";"}], " ", 
+  RowBox[{"(*", "F", "*)"}]}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{
+   RowBox[{"CInherent", " ", "=", " ", 
+    RowBox[{"10.8", " ", "*", " ", 
+     SuperscriptBox["10", 
+      RowBox[{"-", "12"}]]}]}], ";"}], " ", 
+  RowBox[{"(*", "F", "*)"}]}], "\[IndentingNewLine]", 
+ RowBox[{"f", " ", "=", " ", 
+  RowBox[{
+   FractionBox["1", 
+    RowBox[{"2", " ", "\[Pi]"}]], " ", 
+   FractionBox["1", 
+    RowBox[{"Sqrt", "[", 
+     RowBox[{
+      RowBox[{"(", 
+       RowBox[{"L", "+", "LInherent"}], ")"}], " ", "*", 
+      RowBox[{"(", 
+       RowBox[{"CTrap", "+", "CInherent"}], ")"}]}], "]"}]], 
+   " "}]}]}], "Input",
+ CellChangeTimes->{{3.9175316147946053`*^9, 3.917531680786704*^9}, {
+   3.9175319870392427`*^9, 3.917532044488926*^9}, {3.9175323067822943`*^9, 
+   3.917532308144874*^9}, {3.917532524496912*^9, 3.917532539542213*^9}, {
+   3.917532576236331*^9, 3.9175326160155354`*^9}, {3.9175366326615047`*^9, 
+   3.917536632835175*^9}, 3.917538049070804*^9, {3.9175389451160316`*^9, 
+   3.917538967974478*^9}, {3.9175392464048986`*^9, 3.917539254794997*^9}, {
+   3.917539786504751*^9, 3.9175397882028027`*^9}, {3.917620025168665*^9, 
+   3.917620025418737*^9}, {3.917620066333164*^9, 3.917620071191821*^9}, {
+   3.91762011189097*^9, 3.9176201301782703`*^9}, {3.9176207814183903`*^9, 
+   3.91762078182454*^9}, {3.917623477205035*^9, 3.9176235112919397`*^9}, {
+   3.917633085950233*^9, 3.917633086446459*^9}, {3.917633118827663*^9, 
+   3.917633118992832*^9}, {3.9176341328469887`*^9, 3.917634134399194*^9}, {
+   3.917634325629035*^9, 3.917634326842098*^9}, {3.917635156019496*^9, 
+   3.917635186611003*^9}, {3.9176363578125267`*^9, 3.917636390960672*^9}, {
+   3.917699275297673*^9, 3.917699351190301*^9}, {3.9177033048525057`*^9, 
+   3.9177033198596287`*^9}, {3.91770343036936*^9, 3.91770344136845*^9}, {
+   3.917713632360404*^9, 3.917713651682708*^9}, {3.918221087732802*^9, 
+   3.918221089214122*^9}, {3.9294654183222637`*^9, 3.92946541867386*^9}, {
+   3.9294655046191*^9, 3.929465505416245*^9}, {3.9297074767890472`*^9, 
+   3.929707480310103*^9}, {3.929707901239915*^9, 3.929707911440942*^9}, {
+   3.929708151710267*^9, 3.929708151945483*^9}, {3.929708255494727*^9, 
+   3.929708398750287*^9}, {3.92970897170791*^9, 3.9297089737962503`*^9}, {
+   3.929709153904607*^9, 3.929709230157078*^9}, {3.929796492275247*^9, 
+   3.929796622499226*^9}, {3.92980326432374*^9, 3.929803310729596*^9}, {
+   3.929803606790186*^9, 3.929803736219099*^9}, {3.9343755230101347`*^9, 
+   3.934375535315325*^9}},
+ CellLabel->"In[34]:=",ExpressionUUID->"68d82f39-f57f-4a71-8ada-0cdceb983de3"],
+
+Cell[BoxData["1.543781065204792`*^7"], "Output",
+ CellChangeTimes->{
+  3.929707342920011*^9, {3.9297074773642473`*^9, 3.929707480832541*^9}, {
+   3.929707904212817*^9, 3.92970791211852*^9}, 3.929708152353498*^9, {
+   3.929708257531824*^9, 3.92970828626064*^9}, 3.929708326000952*^9, 
+   3.9297965483643703`*^9, {3.929803685782789*^9, 3.92980370099083*^9}, {
+   3.934375525795731*^9, 3.934375535690811*^9}},
+ CellLabel->"Out[44]=",ExpressionUUID->"1323023f-b7de-4982-ac98-437e779f1215"]
+}, Open  ]]
+}, Open  ]]
+},
+WindowSize->{876, 791},
+WindowMargins->{{215, Automatic}, {Automatic, 45}},
+FrontEndVersion->"13.3 for Mac OS X ARM (64-bit) (June 3, 2023)",
+StyleDefinitions->"Default.nb",
+ExpressionUUID->"cf8b313f-8873-4e3a-a278-980124fae891"
+]
+(* End of Notebook Content *)
+
+(* Internal cache information *)
+(*CellTagsOutline
+CellTagsIndex->{}
+*)
+(*CellTagsIndex
+CellTagsIndex->{}
+*)
+(*NotebookFileOutline
+Notebook[{
+Cell[CellGroupData[{
+Cell[580, 22, 237, 4, 98, "Title",ExpressionUUID->"fcaed06a-f9a4-4afc-9273-b7a3583e0cc4"],
+Cell[820, 28, 1153, 28, 541, "Text",ExpressionUUID->"952f4ccd-87eb-4c42-bd9b-1079b183c7a8"],
+Cell[CellGroupData[{
+Cell[1998, 60, 4879, 123, 319, "Input",ExpressionUUID->"68d82f39-f57f-4a71-8ada-0cdceb983de3"],
+Cell[6880, 185, 485, 7, 57, "Output",ExpressionUUID->"1323023f-b7de-4982-ac98-437e779f1215"]
+}, Open  ]]
+}, Open  ]]
+}
+]
+*)
+
