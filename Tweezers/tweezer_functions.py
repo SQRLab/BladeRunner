@@ -154,7 +154,24 @@ def potential_position_dependent(omega_res,linewidths,omega_tweezer,intensity):
     return pot
 
 
+def ion_spacing(N,omega_a):
+    """
+    Calculating the equilibrium positions of the ions in real units, as well as the distance between each ion
+    inputs:
+    N = number of ions
+    omega_a = rf axial trap frequency [2*Pi x Hz]
 
+    returns:
+    list where first entry is list of equilibrium positions of ions in meters and second entry is list of distances between ions in meters
+    """
+    A = np.zeros((N, N))
+    l = lengthScale(omega_a)
+    ueq = calcPositions(N)*l
+    
+    diff_list = []
+    for x, y in zip(ueq[0::], ueq[1::]):
+        diff_list.append(y-x)
+    return [ueq,diff_list]
 
 def omega_tweezer_r(U,beam_waist,m):
     """
