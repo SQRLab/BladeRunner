@@ -93,50 +93,46 @@ def scatteringRWA(omega_tweezer,linewidths,omega_res,P_opt,beam_waist):
     scat = sum(s)
     return scat
 
-def rayleigh_length(FWHM,lambda_beam):
+def rayleigh_length(FWHM, lambda_beam):
     """
-    calculate the rayleigh length of a beam
+    Calculate the Rayleigh length of a beam
     inputs: 
-    FWHM in m 
+    FWHM in meters
     lambda_beam -- wavelength of the beam in meters
-    
     output:
-    rayleigh length in meters
-    
+    Rayleigh length in meters
     """
-    
-    return (pi * FWHM**2)/lambda_beam
+    return (pi * FWHM**2) / lambda_beam
 
-def beam_propogation(FWHM,rayleigh_length,z_pos):
+def beam_propogation(FWHM, z_pos, lambda_beam):
     """
-    calculate the beam propogation 
+    Calculate the beam propagation 
     inputs:
     FWHM --  the full width half max of a gaussian beam
-    rayleigh_length -- calculated from rayleigh_length function
     z_pos -- list of z positions
+    lambda_beam -- wavelength of the beam
     
     output:
-    beam propogation as a function of z
-    
-    
+    beam propagation as a function of z
     """
-    
-    return FWHM * np.sqrt(1 + (z_pos/rayleigh_length)**2)
+    rayleigh = rayleigh_length(FWHM, lambda_beam)
+    return FWHM * np.sqrt(1 + (z_pos / rayleigh)**2)
 
-def intensity(P0,FWHM,beam_propogation,r):
+def intensity(P0, FWHM, z_pos, r, lambda_beam):
     """
-    calculate the intensity of the beam at a given (r,z)
+    Calculate the intensity of the beam at a given (r,z)
     inputs:
+    P0 -- power in watts
     FWHM -- the full width half max of a gaussian beam
-    beam_propogation -- beam propogation as a function of z
+    z_pos -- the z position
+    r -- radial position
+    lambda_beam -- wavelength of the beam
     
     returns:
-    intensity in W/m^2
-    
+    Intensity in W/m^2
     """
-    
-    return (2*P0/(pi*FWHM**2)) * (FWHM / beam_propogation)**2 * np.exp(-2*r**2 / beam_propogation**2)
-
+    beam_prop = beam_propogation(FWHM, z_pos, lambda_beam)
+    return (2 * P0 / (np.pi * FWHM**2)) * (FWHM / beam_prop)**2 * np.exp(-2 * r**2 / beam_prop**2)
 
 def potential_position_dependent(omega_res,linewidths,omega_tweezer,intensity):
     """
@@ -145,6 +141,10 @@ def potential_position_dependent(omega_res,linewidths,omega_tweezer,intensity):
     
     
     """
+    #rayleigh = rayleigh_length(FWHM,lambda_beam) 
+    #beam_prop = beam_propogation(FWHM,rayleigh_length,z_pos)  
+    #intens = intensity(P0,FWHM,beam_propogation,r)
+
     p = []
     for i in range(len(linewidths)): 
         p.append( (-3.*pi*(c**2.)/(2*(omega_res[i]**3.))) \
@@ -153,6 +153,28 @@ def potential_position_dependent(omega_res,linewidths,omega_tweezer,intensity):
     pot = sum(p)
     return pot
 
+def pot_derivative_with_tweeze(x, omega_rf_axial, omega_tw_radial, tweezed_ion, displacement):
+    """
+    derivative of the potential energy of the ion chain, use this to find positions of ions in the trap
+    This one is specifically for tweezing one ion in the chain
+    inputs:
+
+    x: list of ion positions
+    omega_rf_axial: the rf axial trapping frequency [2*pi*Hz]
+    omega_tw_radial: the tweezer radial trapping frequency [2*pi*Hz]
+    tweezed_ion: Ion number for the tweezed ion
+    displacement: distance between the tweezer beam center and position of the tweezed ion
+    """
+    N = len(x)
+    A = 1/2 * m * omega_rf_axial**2
+    B = (e**2) /(4 * pi * eps0)
+    C = 1/2 * m * omega_tw_radial**2
+    
+    return [A*(x[m]) 
+            - sum([B / (abs(x[m] - x[n])**2) for n in range(m) if x[m] != x[n]])  # Avoid division by zero
+            + sum([B / (abs(x[m] - x[n])**2) for n in range(m+1, N) if x[m] != x[n]])  # Avoid division by zero
+            + C*(x[tweezed_ion] - displacement) if m == tweezed_ion else 0  # Only apply tweezer potential to the tweezed ion
+            for m in range(N)]
 
 def ion_spacing(N,omega_a):
     """
