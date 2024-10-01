@@ -226,25 +226,23 @@ def omega_tweezer_a(U,beam_waist,tweezer_wavelength,m):
 
 
 
-def mode_calc_r(m,omega_r_combined,omega_a):
+def mode_calc_r(m,omega_r_combined,ueq,N):
     
     """
     
     Hessian for ions in a pseudo-potential
     
     Inputs:
-    m -- mass of ion
+    N: number of ions 
+    ueq -- list of equilibrium positions of ions (m)
+    m -- mass of ion (kg)
     omega_r_combined -- combined radial frequency taking into account the rf potential as well as the tweezer potentials. 
                 will look like array where each entry for untweezed ion is the rf radial frequency and each entry for the
-                tweezed ions is sqrt(omega_tweezer^2 + omega_r_rf^2)
-    omega_a -- axial trapping frequency created by rf potential
-    
+                tweezed ions is sqrt(omega_tweezer^2 + omega_r_rf^2) (2*pi*Hz)
+    omega_a -- axial trapping frequency created by rf potential (2*pi*Hz)
     
     """
-    N = len(omega_r_combined)
     A = np.zeros((N, N))
-    l = lengthScale(omega_a)
-    ueq = calcPositions(N)*l
     coloumb = ((e**2) / (4 * pi * eps0))
     masses = np.array([m for _ in range(N)])
     for i in range(N):
@@ -267,24 +265,23 @@ def mode_calc_r(m,omega_r_combined,omega_a):
         modes.append((f, vec))
     return modes
 
-def mode_calc_a(m,omega_a,omega_a_combined):
+def mode_calc_a_test(m,omega_a_combined,ueq,N):
     """
     
     Hessian for ions in a pseudo-potential
     
     Inputs:
-    m -- mass of ion
+    N: number of ions
+    ueq -- list of equilibrium positions of the ions (m)
+    m -- mass of ion (kg)
     omega_a_combined -- combined radial frequency taking into account the rf potential as well as the tweezer potentials. 
                 will look like array where each entry for untweezed ion is the rf radial frequency and each entry for the
-                tweezed ions is sqrt(omega_tweezer^2 + omega_a_rf^2)
-    omega_a -- axial trapping frequency created by rf potential
+                tweezed ions is sqrt(omega_tweezer^2 + omega_a_rf^2) (2*pi*Hz)
+    omega_a -- axial trapping frequency created by rf potential (2*pi*Hz)
     
     
     """
-    N = len(omega_a_combined)
     A = np.zeros((N, N))
-    l = lengthScale(omega_a)
-    ueq = calcPositions(N)*l
     coloumb = ((e**2) / (4 * pi * eps0))
     masses = np.array([m for _ in range(N)])
     for i in range(N):
@@ -326,6 +323,9 @@ def combined_frequencies(N,tweezed_ions,w_tweezer_r,w_tweezer_a,w_rf_r,w_rf_a):
     w_rf_a = axial rf trapping frequency [2*Pi x Hz]
     
     returns: array of potential combined trapping frequencies
+                [0] is radial rf and radial tweezer
+                [1] is radial rf and axial tweezer
+                [2] is axial rf and radial tweezer
     
     '''
 
