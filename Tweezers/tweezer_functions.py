@@ -162,8 +162,8 @@ def pot_derivative_with_tweeze(x, omega_rf_axial, omega_tw_radial, tweezed_ion, 
     x: list of ion positions
     omega_rf_axial: the rf axial trapping frequency [2*pi*Hz]
     omega_tw_radial: the tweezer radial trapping frequency [2*pi*Hz]
-    tweezed_ion: Ion number for the tweezed ion
-    displacement: distance between the tweezer beam center and position of the tweezed ion
+    tweezed_ion: Ion number for the tweezed ion MAKE ME A LIST
+    displacement: distance between the tweezer beam center and position of the tweezed ion MAKE ME A LIST
     """
     N = len(x)
     A = 1/2 * m * omega_rf_axial**2
@@ -173,6 +173,7 @@ def pot_derivative_with_tweeze(x, omega_rf_axial, omega_tw_radial, tweezed_ion, 
     return [A*(x[m]) 
             - sum([B / (abs(x[m] - x[n])**2) for n in range(m) if x[m] != x[n]])  # Avoid division by zero
             + sum([B / (abs(x[m] - x[n])**2) for n in range(m+1, N) if x[m] != x[n]])  # Avoid division by zero
+            #MAKE ME A LOOP SO THE LIST MAKES SENSE
             + C*(x[tweezed_ion] - displacement) if m == tweezed_ion else 0  # Only apply tweezer potential to the tweezed ion
             for m in range(N)]
 
@@ -265,7 +266,7 @@ def mode_calc_r(m,omega_r_combined,ueq,N):
         modes.append((f, vec))
     return modes
 
-def mode_calc_a_test(m,omega_a_combined,ueq,N):
+def mode_calc_a(m,omega_a_combined,ueq,N):
     """
     
     Hessian for ions in a pseudo-potential
