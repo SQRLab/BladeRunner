@@ -268,19 +268,14 @@ def mode_calc_r(m,omega_r_combined,ueq,N):
 
 def mode_calc_a(m,omega_a_combined,ueq,N):
     """
-    
     Hessian for ions in a pseudo-potential
-    
     Inputs:
-    N: number of ions
-    ueq -- list of equilibrium positions of the ions (m)
+    ueq -- equilibrium positions of the ions (m)
     m -- mass of ion (kg)
     omega_a_combined -- combined radial frequency taking into account the rf potential as well as the tweezer potentials. 
                 will look like array where each entry for untweezed ion is the rf radial frequency and each entry for the
                 tweezed ions is sqrt(omega_tweezer^2 + omega_a_rf^2) (2*pi*Hz)
     omega_a -- axial trapping frequency created by rf potential (2*pi*Hz)
-    
-    
     """
     A = np.zeros((N, N))
     coloumb = ((e**2) / (4 * pi * eps0))
@@ -295,9 +290,7 @@ def mode_calc_a(m,omega_a_combined,ueq,N):
 
     eigvals, eigvecs = np.linalg.eig(A) # this gives eigenvalues and eigenvectors
     freqs =( np.sqrt(1*eigvals))/(2*pi*m) #eigenvalue = spring constant k, so freq = sqrt(e-val)/(2*pi*m)
-    print(freqs)
-    
-    
+
     scaledmodes = [(f, v) for f, v in zip(freqs, eigvecs.T)]
     scaledmodes = sorted(scaledmodes, key=lambda mode: mode[0],reverse=False)
     modes = []
