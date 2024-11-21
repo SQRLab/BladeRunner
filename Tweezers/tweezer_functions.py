@@ -376,7 +376,7 @@ def individual_freqs_to_mode_vectors(N,tweezed_ions,w_tweezer_r,w_tweezer_a,w_rf
     combined_freqs = combined_frequencies(N,tweezed_ions,w_tweezer_r,w_tweezer_a,w_rf_r,w_rf_a)
     omega_r_combined = combined_freqs[0]
     omega_a = w_rf_a
-    return mode_calc_r(m,omega_r_combined,omega_a)
+    return mode_calc_r(m,omega_r_combined,omega_a,N)
 
 def individual_freqs_to_mode_vectors_axial(N,tweezed_ions,w_tweezer_r,w_tweezer_a,w_rf_r,w_rf_a):
     """
