@@ -1,6 +1,7 @@
 from scipy import constants
 import numpy as np
 from IonChainTools import calcPositions,lengthScale
+from scipy.optimize import fsolve
 
 #Constants in SI units
 eps0 = constants.epsilon_0
@@ -160,8 +161,8 @@ def pot_derivative_with_tweeze(x, omega_rf_axial, omega_tw_radial, tweezed_ion, 
     inputs:
 
     x: list of ion positions
-    omega_rf_axial: the rf axial trapping frequency [2*pi*Hz]
-    omega_tw_radial: the tweezer radial trapping frequency [2*pi*Hz]
+    omega_rf_axial: the rf axial trapping frequency [Hz]
+    omega_tw_radial: the tweezer radial trapping frequency [Hz]
     tweezed_ion: Ion number for the tweezed ion MAKE ME A LIST
     displacement: distance between the tweezer beam center and position of the tweezed ion MAKE ME A LIST
     """
@@ -175,6 +176,30 @@ def pot_derivative_with_tweeze(x, omega_rf_axial, omega_tw_radial, tweezed_ion, 
             + sum([B / (abs(x[m] - x[n])**2) for n in range(m+1, N) if x[m] != x[n]])  # Avoid division by zero
             #MAKE ME A LOOP SO THE LIST MAKES SENSE
             + C*(x[tweezed_ion] - displacement) if m == tweezed_ion else 0  # Only apply tweezer potential to the tweezed ion
+            for m in range(N)]
+
+def pot_derivative_with_2tweeze(x, omega_rf_axial, omega_tw_radial, tweezed_ion1,tweezed_ion2, displacement1,displacement2):
+    """
+    derivative of the potential energy of the ion chain, use this to find positions of ions in the trap
+    This one is specifically for tweezing one ion in the chain
+    inputs:
+
+    x: list of ion positions
+    omega_rf_axial: the rf axial trapping frequency [2*pi*Hz]
+    omega_tw_radial: the tweezer radial trapping frequency [2*pi*Hz]
+    tweezed_ion: Ion number for the tweezed ion
+    displacement: distance between the tweezer beam center and position of the tweezed ion
+    """
+    N = len(x)
+    A = 1/2 * m * omega_rf_axial**2
+    B = (e**2) /(4 * pi * eps0)
+    C = 1/2 * m * omega_tw_radial**2
+    
+    return [A*(x[m]) 
+            - sum([B / (abs(x[m] - x[n])**2) for n in range(m) if x[m] != x[n]])  # Avoid division by zero
+            + sum([B / (abs(x[m] - x[n])**2) for n in range(m+1, N) if x[m] != x[n]])  # Avoid division by zero
+            + C*(x[tweezed_ion1] - displacement1) if m == tweezed_ion1 else 0  # Only apply tweezer potential to the tweezed ion1
+            + C*(x[tweezed_ion2] + displacement2) if m == tweezed_ion2 else 0  # Only apply tweezer potential to the tweezed ion2|
             for m in range(N)]
 
 def ion_spacing(N,omega_a):
