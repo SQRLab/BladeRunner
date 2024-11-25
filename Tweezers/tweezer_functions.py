@@ -228,6 +228,13 @@ def ion_spacing_tweezers(potential_from_tweezers,ionspacing,omega_rf_axial,omega
         diff_list.append(y-x)
     return [ueq,diff_list]
 
+def ion_spacing_2_tweezers(pot_derivative_with_2tweeze,ionspacing,omega_rf_axial, omega_tw_radial, tweezed_ion1,tweezed_ion2, displacement1,displacement2):
+    ueq = fsolve(pot_derivative_with_2tweeze,ionspacing[0],args = (omega_rf_axial, omega_tw_radial, tweezed_ion1,tweezed_ion2, displacement1,displacement2))
+    diff_list = []
+    for x, y in zip(ueq[0::], ueq[1::]):
+        diff_list.append(y-x)
+    return [ueq,diff_list]
+
 def omega_tweezer_r(U,beam_waist,m):
     """
     Calculating the radial tweezer trap frequency (perpendicular to laser propogation) at r=0 and z=0
