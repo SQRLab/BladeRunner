@@ -198,8 +198,8 @@ def pot_derivative_with_2tweeze(x, omega_rf_axial, omega_tw_radial, tweezed_ion1
     return [A*(x[m]) 
             - sum([B / (abs(x[m] - x[n])**2) for n in range(m) if x[m] != x[n]])  # Avoid division by zero
             + sum([B / (abs(x[m] - x[n])**2) for n in range(m+1, N) if x[m] != x[n]])  # Avoid division by zero
-            + C*(x[tweezed_ion1] - displacement1) if m == tweezed_ion1 else 0  # Only apply tweezer potential to the tweezed ion1
-            + C*(x[tweezed_ion2] + displacement2) if m == tweezed_ion2 else 0  # Only apply tweezer potential to the tweezed ion2|
+            + C*(x[tweezed_ion1] + displacement1) if m == tweezed_ion1 else 0  # Only apply tweezer potential to the tweezed ion1
+            + C*(x[tweezed_ion2] - displacement2) if m == tweezed_ion2 else 0  # Only apply tweezer potential to the tweezed ion2|
             for m in range(N)]
 
 def ion_spacing(N,omega_a):
