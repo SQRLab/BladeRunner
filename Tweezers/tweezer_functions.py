@@ -452,7 +452,7 @@ def individual_freqs_to_mode_vectors_radial_weak(N,tweezed_ions,w_tweezer_r,w_tw
     omega_a = w_rf_a
     return mode_calc_r(m,omega_r_combined,omega_a)
 
-def tweezer_optical_potential_to_trap_frequency(tweezer_wavelength,linewidths,omega_res,P_opt,beam_waist,m):
+def tweezer_optical_potential_to_trap_frequency(tweezer_wavelength,linewidths,omega_res,P_opt,beam_waist,m,U):
     """
     takes in physical parameters of calcium ion and tweezer beam and outputs expected tweezer trap frequency
     
@@ -464,6 +464,8 @@ def tweezer_optical_potential_to_trap_frequency(tweezer_wavelength,linewidths,om
     omega_res = angular frequency of resonant transition, also based off NIST data [2*Pi x Hz]
     beam_waist = beamwaist of the tweezer laser beam
     given its frequency and the NA of our system or from measurement
+    U = potential(omega_tweezer,linewidths,omega_res,P_opt,beam_waist) OR 
+        potential_position_dependent(omega_res,linewidths,omega_tweezer,intensity)
     
     outputs:
     array of radial and axial tweezer trap frequencies [2*Pi x Hz]
@@ -471,14 +473,14 @@ def tweezer_optical_potential_to_trap_frequency(tweezer_wavelength,linewidths,om
     """
     omega_tweezer = 2*pi*c/tweezer_wavelength
     
-    U = potential(omega_tweezer,linewidths,omega_res,P_opt,beam_waist)
+    
     w_tweezer_r =  omega_tweezer_r(U,beam_waist,m)
     w_tweezer_a = omega_tweezer_a(U,beam_waist,tweezer_wavelength,m)
     return np.array([w_tweezer_r,w_tweezer_a])
 
 
 
-def physical_params_to_radial_mode_vectors(N,ueq,tweezed_ions,tweezer_wavelength,linewidths,omega_res,w_rf_a,w_rf_r,P_opt,beam_waist,m):
+def physical_params_to_radial_mode_vectors(N,ueq,tweezed_ions,tweezer_wavelength,linewidths,omega_res,w_rf_a,w_rf_r,P_opt,beam_waist,m,U):
     """
     takes in physical parameters of tweezer beam and calcium ion as well as rf 
     trapping parameters to output combined radial modes
@@ -497,6 +499,8 @@ def physical_params_to_radial_mode_vectors(N,ueq,tweezed_ions,tweezer_wavelength
     w_tweezer_a = axial trapping frequency of tweezer [2*Pi x Hz]
     w_rf_r = radial rf trapping frequency [2*Pi x Hz]
     w_rf_a = axial rf trapping frequency [2*Pi x Hz]
+    U = potential(omega_tweezer,linewidths,omega_res,P_opt,beam_waist) OR 
+        potential_position_dependent(omega_res,linewidths,omega_tweezer,intensity)
     
     outputs:
     modes from mode_calc_r, frequencies in Hz (not angular)
@@ -505,12 +509,12 @@ def physical_params_to_radial_mode_vectors(N,ueq,tweezed_ions,tweezer_wavelength
    
     omega_tweezer = 2*pi*c/tweezer_wavelength
     
-    U = potential(omega_tweezer,linewidths,omega_res,P_opt,beam_waist)
+    #U = potential(omega_tweezer,linewidths,omega_res,P_opt,beam_waist)
     w_tweezer_r =  omega_tweezer_r(U,beam_waist,m)
     w_tweezer_a = omega_tweezer_a(U,beam_waist,tweezer_wavelength,m)
     return individual_freqs_to_mode_vectors(N,tweezed_ions,w_tweezer_r,w_tweezer_a,w_rf_r,w_rf_a,ueq)
 
-def physical_params_to_axial_mode_vectors(N,ueq,tweezed_ions,tweezer_wavelength,linewidths,omega_res,w_rf_a,w_rf_r,P_opt,beam_waist,m):
+def physical_params_to_axial_mode_vectors(N,ueq,tweezed_ions,tweezer_wavelength,linewidths,omega_res,w_rf_a,w_rf_r,P_opt,beam_waist,m,U):
     """
     takes in physical parameters of tweezer beam and calcium ion as well as rf 
     trapping parameters to output combined axial modes
@@ -529,6 +533,8 @@ def physical_params_to_axial_mode_vectors(N,ueq,tweezed_ions,tweezer_wavelength,
     w_tweezer_a = axial trapping frequency of tweezer [2*Pi x Hz]
     w_rf_r = radial rf trapping frequency [2*Pi x Hz]
     w_rf_a = axial rf trapping frequency [2*Pi x Hz]
+    U = potential(omega_tweezer,linewidths,omega_res,P_opt,beam_waist) OR 
+        potential_position_dependent(omega_res,linewidths,omega_tweezer,intensity)
     
     outputs:
     modes from mode_calc_r, frequencies in Hz (not angular)
@@ -537,12 +543,12 @@ def physical_params_to_axial_mode_vectors(N,ueq,tweezed_ions,tweezer_wavelength,
    
     omega_tweezer = 2*pi*c/tweezer_wavelength
     
-    U = potential(omega_tweezer,linewidths,omega_res,P_opt,beam_waist)
+    #U = potential(omega_tweezer,linewidths,omega_res,P_opt,beam_waist)
     w_tweezer_r =  omega_tweezer_r(U,beam_waist,m)
     w_tweezer_a = omega_tweezer_a(U,beam_waist,tweezer_wavelength,m)
     return individual_freqs_to_mode_vectors_axial(N,tweezed_ions,w_tweezer_r,w_tweezer_a,w_rf_r,w_rf_a,ueq)
 
-def physical_params_to_radial_mode_vectors_weak(N,tweezed_ions,tweezer_wavelength,linewidths,omega_res,w_rf_a,w_rf_r,P_opt,beam_waist,m):
+def physical_params_to_radial_mode_vectors_weak(N,tweezed_ions,tweezer_wavelength,linewidths,omega_res,w_rf_a,w_rf_r,P_opt,beam_waist,m,U):
     """
     unsure what this one is too
     takes in physical parameters of tweezer beam and calcium ion as well as rf 
@@ -562,6 +568,8 @@ def physical_params_to_radial_mode_vectors_weak(N,tweezed_ions,tweezer_wavelengt
     w_tweezer_a = axial trapping frequency of tweezer [2*Pi x Hz]
     w_rf_r = radial rf trapping frequency [2*Pi x Hz]
     w_rf_a = axial rf trapping frequency [2*Pi x Hz]
+    U = potential(omega_tweezer,linewidths,omega_res,P_opt,beam_waist) OR 
+        potential_position_dependent(omega_res,linewidths,omega_tweezer,intensity)
     
     outputs:
     modes from mode_calc_r, frequencies in Hz (not angular)
@@ -570,7 +578,7 @@ def physical_params_to_radial_mode_vectors_weak(N,tweezed_ions,tweezer_wavelengt
    
     omega_tweezer = 2*pi*c/tweezer_wavelength
     
-    U = potential(omega_tweezer,linewidths,omega_res,P_opt,beam_waist)
+    #U = potential(omega_tweezer,linewidths,omega_res,P_opt,beam_waist)
     w_tweezer_r =  omega_tweezer_r(U,beam_waist,m)
     w_tweezer_a = omega_tweezer_a(U,beam_waist,tweezer_wavelength,m)
     return individual_freqs_to_mode_vectors_radial_weak(N,tweezed_ions,w_tweezer_r,w_tweezer_a,w_rf_r,w_rf_a)
