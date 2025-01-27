@@ -119,21 +119,35 @@ def beam_propogation(FWHM, z_pos, lambda_beam):
     rayleigh = rayleigh_length(FWHM, lambda_beam)
     return FWHM * np.sqrt(1 + (z_pos / rayleigh)**2)
 
-def intensity(P0, FWHM, z_pos, r, lambda_beam):
+def intensity(P0, beam_prop, z_pos, r, lambda_beam):
     """
+    REPLACE FWHM WITH BEAM WAIST HERE!!!
     Calculate the intensity of the beam at a given (r,z)
     inputs:
-    P0 -- power in watts
-    FWHM -- the full width half max of a gaussian beam
-    z_pos -- the z position
-    r -- radial position
-    lambda_beam -- wavelength of the beam
+    P0 -- power [W]
+    z_pos -- the z position [m] 
+    r -- radial position [m]
+    lambda_beam -- wavelength of the beam [m]
+    beam_prop -- beam propogation from beam_propogation function [m]
     
     returns:
     Intensity in W/m^2
     """
-    beam_prop = beam_propogation(FWHM, z_pos, lambda_beam)
-    return (2 * P0 / (np.pi * FWHM**2)) * (FWHM / beam_prop)**2 * np.exp(-2 * r**2 / beam_prop**2)
+    #beam_prop = beam_propogation(FWHM, z_pos, lambda_beam)
+    return (2 * P0 / (np.pi * beam_prop))  * np.exp(-2 * r**2 / beam_prop**2)
+
+def intensity_TEM10(E0,n,beam_prop,x_pos,y_pos):
+"""
+beam propogation in z_axis
+inputs:
+E0 -- electric field amplitude [V/m]
+n -- refractive index of the medium
+beam_prop -- beam propogation from beam_propogation function [m]
+x_pos -- list of x positions where x corresponds to the 1 
+y_pos -- list of y positions where y corresponds to the 2
+
+"""
+    return (  c * eps0 * n / 2 ) * (E0 **2 * FWHM**2 )/ (wz**2) * 8*x_pos**2 / (wz**2) * np.exp(-2*x_pos**2 / wz**2) * np.exp(-2*y_pos**2 / wz**2)
 
 def potential_position_dependent(omega_res,linewidths,omega_tweezer,intensity):
     """
