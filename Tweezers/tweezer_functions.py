@@ -119,35 +119,46 @@ def beam_propogation(FWHM, z_pos, lambda_beam):
     rayleigh = rayleigh_length(FWHM, lambda_beam)
     return FWHM * np.sqrt(1 + (z_pos / rayleigh)**2)
 
-def intensity(P0, beam_prop, z_pos, r, lambda_beam):
+def intensity(x_pos,y_pos,P0, wz):
     """
-    REPLACE FWHM WITH BEAM WAIST HERE!!!
-    Calculate the intensity of the beam at a given (r,z)
+    Calculate the intensity of a Gaussian beam at a given (r,z)
     inputs:
+    x_pos -- list of x positions [m]
+    y_pos -- list of y positions [m]
     P0 -- power [W]
-    z_pos -- the z position [m] 
-    r -- radial position [m]
-    lambda_beam -- wavelength of the beam [m]
-    beam_prop -- beam propogation from beam_propogation function [m]
+    wz -- beam waist [m] calculated from beam_propogation function
     
     returns:
     Intensity in W/m^2
     """
-    #beam_prop = beam_propogation(FWHM, z_pos, lambda_beam)
-    return (2 * P0 / (np.pi * beam_prop))  * np.exp(-2 * r**2 / beam_prop**2)
+    return (2 * P0 / (np.pi * wz**2))  * np.exp(-2 * x_pos**2 / wz**2) * np.exp(-2 * y_pos**2 / wz**2)
 
-def intensity_TEM10(E0,n,beam_prop,x_pos,y_pos):
-"""
-beam propogation in z_axis
-inputs:
-E0 -- electric field amplitude [V/m]
-n -- refractive index of the medium
-beam_prop -- beam propogation from beam_propogation function [m]
-x_pos -- list of x positions where x corresponds to the 1 
-y_pos -- list of y positions where y corresponds to the 2
+def intensity_TEM10(x_pos,y_pos,w0,wz,E0,n):
+    """
+    Calculate the intensity of a TEM10 beam at a given (r,z)
+    inputs:
+    x_pos -- list of x positions [m]
+    y_pos -- list of y positions [m]
+    P0 -- power [W]
+    w0 -- minimum beam waist at z=0 [m], same one that is used in beam_propogation function
+    wz -- beam waist [m] calculated from beam_propogation function
 
-"""
-    return (  c * eps0 * n / 2 ) * (E0 **2 * FWHM**2 )/ (wz**2) * 8*x_pos**2 / (wz**2) * np.exp(-2*x_pos**2 / wz**2) * np.exp(-2*y_pos**2 / wz**2)
+    returns:
+    Intensity in W/m^2
+    """
+    return (  c * eps0 * n / 2 ) * (E0 **2 * w0**2 )/ (wz**2) * (8*x_pos**2 / (wz**2)) * np.exp(-2*x_pos**2 / wz**2) * np.exp(-2*y_pos**2 / wz**2)
+
+def half_angle_beam_divergence(M_squared,w0,lambda_beam):
+    """
+    Calculate the half angle beam divergence
+    inputs:
+    M_squared -- beam quality factor
+    w0 -- beam waist [m]
+    lambda_beam -- wavelength of the beam [m]
+    returns:
+    half angle beam divergence in radians
+    """
+    return M_squared * lambda_beam/ (pi* w0)
 
 def potential_position_dependent(omega_res,linewidths,omega_tweezer,intensity):
     """
