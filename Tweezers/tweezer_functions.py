@@ -179,6 +179,16 @@ def potential_position_dependent(omega_res,linewidths,omega_tweezer,intensity):
     pot = sum(p)
     return pot
 
+def scattering_position_dependent(omega_res, linewidths, omega_tweezer, intensity):
+    s = []
+    for i in range(len(linewidths)):
+        s.append(((3 * c**2 * intensity) / (2 * hbar * omega_res[i]**3)) *
+                 (omega_tweezer / omega_res[i])**3 * 
+                 ((linewidths[i] / (omega_res[i] - omega_tweezer) +
+                   linewidths[i] / (omega_res[i] + omega_tweezer))**2))
+    scat = sum(s)
+    return scat
+
 def pot_derivative_with_tweeze(x, omega_rf_axial, omega_tw_radial, tweezed_ion, displacement):
     """
     derivative of the potential energy of the ion chain, use this to find positions of ions in the trap
@@ -286,6 +296,26 @@ def omega_tweezer_a(U,beam_waist,tweezer_wavelength,m):
        m = mass of ion
        """
     return ((2*abs(U)/m)**(1/2)) * 1/((pi*(beam_waist**2)/tweezer_wavelength))
+
+def TEM10_tweezer_optical_potential_to_trap_frequency_y(linewidths, omega_res,omega_tweezer, w0, m, E0,n=1):
+    p = []
+    for i in range(len(linewidths)): 
+        p.append(np.sqrt(
+            (16*pi*c**3*eps0*E0**2*n)/(m*omega_res[i]**3*w0**4) * (linewidths[i]/((omega_res[i] - omega_tweezer)) +
+                                            linewidths[i]/(omega_res[i] + omega_tweezer))
+        ))
+    pot = sum(p)
+    return pot
+
+def TEM10_tweezer_optical_potential_to_trap_frequency_x(linewidths, omega_res,omega_tweezer w0, m, E0,n=1):
+    p = []
+    for i in range(len(linewidths)): 
+        p.append(np.sqrt(
+            (8*pi*c**3*eps0*E0**2*n)/(m*omega_res[i]**3*w0**2) * (linewidths[i]/((omega_res[i] - omega_tweezer)) +
+                                            linewidths[i]/(omega_res[i] + omega_tweezer))
+        ))
+    pot = sum(p)
+    return pot
 
 def mode_calc_r(m,omega_r_combined,ueq,N):
     
