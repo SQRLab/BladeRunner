@@ -94,30 +94,30 @@ def scatteringRWA(omega_tweezer,linewidths,omega_res,P_opt,beam_waist):
     scat = sum(s)
     return scat
 
-def rayleigh_length(FWHM, lambda_beam):
+def rayleigh_length(w0, lambda_beam):
     """
     Calculate the Rayleigh length of a beam
     inputs: 
-    FWHM in meters
-    lambda_beam -- wavelength of the beam in meters
+    w0 -- minimum beam waist [m]
+    lambda_beam -- wavelength of the beam in meters [m]
     output:
     Rayleigh length in meters
     """
-    return (pi * FWHM**2) / lambda_beam
+    return (pi * w0**2) / lambda_beam
 
-def beam_propogation(FWHM, z_pos, lambda_beam):
+def beam_propogation(w0, z_pos, lambda_beam):
     """
     Calculate the beam propagation 
     inputs:
-    FWHM --  the full width half max of a gaussian beam
-    z_pos -- list of z positions
-    lambda_beam -- wavelength of the beam
+    w0 --  minimum beam waist [m]
+    z_pos -- list of z positions [m]
+    lambda_beam -- wavelength of the beam [m]
     
     output:
     beam propagation as a function of z
     """
-    rayleigh = rayleigh_length(FWHM, lambda_beam)
-    return FWHM * np.sqrt(1 + (z_pos / rayleigh)**2)
+    rayleigh = rayleigh_length(w0, lambda_beam)
+    return w0 * np.sqrt(1 + (z_pos / rayleigh)**2)
 
 def intensity(x_pos,y_pos,P0, wz):
     """
@@ -146,7 +146,7 @@ def intensity_TEM10(x_pos,y_pos,w0,wz,E0,n):
     returns:
     Intensity in W/m^2
     """
-    return (  c * eps0 * n / 2 ) * (E0 **2 * w0**2 )/ (wz**2) * (8*x_pos**2 / (wz**2)) * np.exp(-2*x_pos**2 / wz**2) * np.exp(-2*y_pos**2 / wz**2)
+    return ( (( c * eps0 * n / 2 ) * (E0 **2 * w0**2 ))/ (wz**2) )* (8*x_pos**2 / (wz**2)) * np.exp(-2*x_pos**2 / wz**2) * np.exp(-2*y_pos**2 / wz**2)
 
 def half_angle_beam_divergence(M_squared,w0,lambda_beam):
     """
@@ -297,22 +297,22 @@ def omega_tweezer_a(U,beam_waist,tweezer_wavelength,m):
        """
     return ((2*abs(U)/m)**(1/2)) * 1/((pi*(beam_waist**2)/tweezer_wavelength))
 
-def TEM10_tweezer_optical_potential_to_trap_frequency_y(linewidths, omega_res,omega_tweezer, w0, m, E0,n=1):
+def TEM10_tweezer_optical_potential_to_trap_frequency_y(linewidths, omega_res,omega_tweezer, w0, m, P0):
     p = []
     for i in range(len(linewidths)): 
         p.append(np.sqrt(
-            (16*pi*c**3*eps0*E0**2*n)/(m*omega_res[i]**3*w0**4) * (linewidths[i]/((omega_res[i] - omega_tweezer)) +
+            ((8*P0/(np.exp(1)*pi*w0**4))*((-2*pi*c**2) * (2/m) ) /(2*omega_res**3) ) * (linewidths[i]/((omega_res[i] - omega_tweezer)) +
                                             linewidths[i]/(omega_res[i] + omega_tweezer))
         ))
     pot = sum(p)
     return pot
 
-def TEM10_tweezer_optical_potential_to_trap_frequency_x(linewidths, omega_res,omega_tweezer w0, m, E0,n=1):
+def TEM10_tweezer_optical_potential_to_trap_frequency_x(linewidths, omega_res,omega_tweezer, w0, m, P0):
     p = []
     for i in range(len(linewidths)): 
         p.append(np.sqrt(
-            (8*pi*c**3*eps0*E0**2*n)/(m*omega_res[i]**3*w0**2) * (linewidths[i]/((omega_res[i] - omega_tweezer)) +
-                                            linewidths[i]/(omega_res[i] + omega_tweezer))
+            ((40*P0/(np.exp(1)*pi*w0**4))*((-2*pi*c**2) * (2/m) )/(m*omega_res[i]**3*w0**2) * (linewidths[i]/((omega_res[i] - omega_tweezer)) +
+                                            linewidths[i]/(omega_res[i] + omega_tweezer)))
         ))
     pot = sum(p)
     return pot
@@ -389,6 +389,18 @@ def mode_calc_a(m,omega_a_combined,ueq,N):
         vec = vec / np.sqrt(vec.dot(vec))
         modes.append((f, vec))
     return modes
+
+def eta(mode_structure,tweezer_wavelength,N):
+    """input:
+    mode structure as output from mode_calc_r or mode_calc_a
+    output:
+    eta values for each mode and ion
+    """
+
+    eta = []
+    for mode in mode_structure:
+        eta.append([mode[1][i] * (2 * pi / tweezer_wavelength) * np.sqrt(hbar / (2 * m * mode[0])) for i in range(N)])
+    return eta
 
 def combined_frequencies(N,tweezed_ions,w_tweezer_r,w_tweezer_a,w_rf_r,w_rf_a):
     '''
