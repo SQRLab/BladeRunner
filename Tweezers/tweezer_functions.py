@@ -332,6 +332,8 @@ def mode_calc_r(m,omega_r_combined,ueq,N):
                 tweezed ions is sqrt(omega_tweezer^2 + omega_r_rf^2) (2*pi*Hz)
     omega_a -- axial trapping frequency created by rf potential (2*pi*Hz)
     
+    Outputs: 
+    modes -- list of tuples where each tuple is a mode (frequency [Hz], eigenvector)
     """
     A = np.zeros((N, N))
     coloumb = ((e**2) / (4 * pi * eps0))
@@ -366,7 +368,11 @@ def mode_calc_a(m,omega_a_combined,ueq,N):
                 will look like array where each entry for untweezed ion is the rf radial frequency and each entry for the
                 tweezed ions is sqrt(omega_tweezer^2 + omega_a_rf^2) (2*pi*Hz)
     omega_a -- axial trapping frequency created by rf potential (2*pi*Hz)
+    
+    Outputs: 
+    modes -- list of tuples where each tuple is a mode (frequency [Hz], eigenvector)
     """
+
     A = np.zeros((N, N))
     coloumb = ((e**2) / (4 * pi * eps0))
     masses = np.array([m for _ in range(N)])
@@ -394,7 +400,7 @@ def eta(mode_structure,tweezer_wavelength,N):
     """input:
     mode structure as output from mode_calc_r or mode_calc_a
     output:
-    eta values for each mode and ion
+    mode structure but eta values for each mode and ion instead of just the eigenvectors
     """
 
     eta = []
