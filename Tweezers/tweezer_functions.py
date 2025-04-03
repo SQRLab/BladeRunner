@@ -400,7 +400,7 @@ def eta(mode_structure,tweezer_wavelength,N):
     """input:
     mode structure as output from mode_calc_r or mode_calc_a
     output:
-    mode structure but eta values for each mode and ion instead of just the eigenvectors
+    eta values for each mode and ion instead of just the eigenvectors
     """
 
     eta = []
