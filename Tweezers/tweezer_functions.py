@@ -396,16 +396,18 @@ def mode_calc_a(m,omega_a_combined,ueq,N):
         modes.append((f, vec))
     return modes
 
-def eta(mode_structure,tweezer_wavelength,N):
+def eta(mode_structure,qubit_wavelength,N):
     """input:
     mode structure as output from mode_calc_r or mode_calc_a
+    N = number of ions
+    qubit_wavelength = wavelength of qubit transition [m] (729e-9 for Ca)
     output:
     eta values for each mode and ion instead of just the eigenvectors
     """
 
     eta = []
     for mode in mode_structure:
-        eta.append([mode[1][i] * (2 * pi / tweezer_wavelength) * np.sqrt(hbar / (2 * m * mode[0])) for i in range(N)])
+        eta.append([mode[1][i] * (2 * pi / qubit_wavelength) * np.sqrt(hbar / (2 * m * mode[0])) for i in range(N)])
     return eta
 
 def combined_frequencies(N,tweezed_ions,w_tweezer_r,w_tweezer_a,w_rf_r,w_rf_a):
