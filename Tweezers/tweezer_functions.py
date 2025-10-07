@@ -14,7 +14,7 @@ pi = np.pi
 
 def potential(omega_tweezer,linewidths,omega_res,P_opt,beam_waist):
     '''
-    Find the potential of the optical tweezers beam for
+    Find the dipole potential of the optical tweezers beam for
     the given set of parameters at r=0 and z=0 -- without RWA
 
 
