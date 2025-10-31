@@ -2,6 +2,10 @@ from scipy import constants
 import numpy as np
 from IonChainTools import calcPositions,lengthScale
 from scipy.optimize import fsolve
+import itertools
+from itertools import product
+import pandas as pd
+import re
 
 #Constants in SI units
 eps0 = constants.epsilon_0
@@ -657,3 +661,252 @@ def physical_params_to_radial_mode_vectors_weak(N,tweezed_ions,tweezer_wavelengt
     w_tweezer_r =  omega_tweezer_r(U,beam_waist,m)
     w_tweezer_a = omega_tweezer_a(U,beam_waist,tweezer_wavelength,m)
     return individual_freqs_to_mode_vectors_radial_weak(N,tweezed_ions,w_tweezer_r,w_tweezer_a,w_rf_r,w_rf_a)
+
+#this section down here is functions for the sideband cooling calculations
+
+def tweezer_combos_full_radial(
+    omega_tweezer,
+    linewidths,
+    omega_res,
+    m,
+    mode_calc_r,
+    N_list,
+    f_rf_r,
+    P_opt,
+    w0,
+    max_tweezed=1,
+):
+    """
+    Compute all tweezer combinations and corresponding radial mode frequencies,
+    including power dependence and tweezed/untweezed mode separation.
+
+    mode_calc_r is expected to return a list of tuples:
+        [(freq1, eigvec1), (freq2, eigvec2), ...]
+    This version ensures the dataframe has Mode0_eigvec, Mode1_eigvec, ... Mode{N-1}_eigvec
+    and Mode0_freq, Mode1_freq, ... Mode{N-1}_freq for each row (missing entries filled with NaN).
+    """
+
+
+    # --- Normalize inputs ---
+    if np.isscalar(N_list):
+        N_list = [int(N_list)]
+    if np.isscalar(P_opt):
+        P_opt = [P_opt]
+
+    pi = np.pi
+    rows = []
+
+    # --- Loop over number of ions ---
+    for N in N_list:
+        # Generate all possible tweezer combinations
+        all_combos = []
+        for r in range(0, max_tweezed + 1):
+            all_combos.extend(itertools.combinations(range(N), r))
+
+        # RF trap setup
+        w_rf_r = f_rf_r * 2 * pi
+        w_rf_r_list = np.full(N, w_rf_r)
+        ueq = ion_spacing(N, f_rf_r)[0]
+
+        # --- Loop over optical powers ---
+        for P_total in P_opt:
+            for tweezed_positions in all_combos:
+                n_tweezed = len(tweezed_positions)
+                P_per = P_total / n_tweezed if n_tweezed > 0 else 0.0
+
+                # Compute tweezer potential for this configuration
+                pot = potential(omega_tweezer, linewidths, omega_res, P_per, w0)
+                w_tw_r = omega_tweezer_r(pot, w0, m)
+
+                # Combine tweezed and untweezed radial frequencies
+                combo = np.array([
+                    np.sqrt(w_tw_r**2 + w_rf_r_list[i]**2) if i in tweezed_positions else w_rf_r_list[i]
+                    for i in range(N)
+                ])
+
+                # --- Compute radial modes ---
+                modes = mode_calc_r(m, combo, ueq, N)
+
+                # Extract frequencies and eigenvectors
+                freqs = np.array([f for f, v in modes], dtype=float) if len(modes) else np.array([], dtype=float)
+                if len(modes):
+                    eigvecs = np.vstack([np.ravel(v) for f, v in modes])  # shape (n_modes, N)
+                else:
+                    eigvecs = np.empty((0, N))
+
+                # --- Initialize row with shared info ---
+                row = {
+                    "N": N,
+                    "Tweezed ions": tweezed_positions,
+                    "P_per_tweezer (W)": P_per,
+                    "Combined radial frequencies": combo,
+                }
+
+                # --- Ensure columns for all possible modes up to N exist per row ---
+                # Fill Mode{i}_freq and Mode{i}_eigvec for i in [0, N-1]
+                for mode_index in range(N):
+                    # frequency
+                    if mode_index < len(freqs):
+                        row[f"Mode{mode_index}_freq"] = float(freqs[mode_index])
+                    else:
+                        row[f"Mode{mode_index}_freq"] = np.nan
+
+                    # eigenvector (length N) or NaN array
+                    if mode_index < eigvecs.shape[0]:
+                        row[f"Mode{mode_index}_eigvec"] = np.ravel(eigvecs[mode_index]).astype(float)
+                    else:
+                        # use full-length nan array to keep shape consistent
+                        row[f"Mode{mode_index}_eigvec"] = np.full(N, np.nan, dtype=float)
+
+                # --- Store completed row ---
+                rows.append(row)
+
+    return pd.DataFrame(rows)
+# ...existing code...
+def build_mode_series_and_combinations(df, max_modes=None):
+    """
+    Extract per-mode lists of (df_index, eigvec_array) from df.
+
+    Returns a dict with:
+      - mode_series: mapping mode_index -> original pandas Series (unchanged)
+      - mode_lists:  mapping mode_index -> list of tuples (df_index, np.ndarray(eigvec))
+    If max_modes is set, only modes with index < max_modes are returned.
+    """
+
+
+    # find Mode{i}_eigvec columns sorted by i
+    mode_cols = sorted(
+        [c for c in df.columns if re.match(r"^Mode\d+_eigvec$", c)],
+        key=lambda c: int(re.match(r"Mode(\d+)_eigvec$", c).group(1)),
+    )
+    mode_indices = [int(re.match(r"Mode(\d+)_eigvec$", c).group(1)) for c in mode_cols]
+
+    if max_modes is not None:
+        mode_indices = [i for i in mode_indices if i < int(max_modes)]
+
+    # keep the original Series for convenience
+    mode_series = {i: df[f"Mode{i}_eigvec"] for i in mode_indices}
+
+    # build lists of (original_index, np.array(value)) for each mode
+    mode_lists = {}
+    for i in mode_indices:
+        col = f"Mode{i}_eigvec"
+        items = []
+        if col in df.columns:
+            for idx in df.index:
+                val = df.at[idx, col]
+                # convert to a numeric numpy array (works if stored as list/ndarray/scalar)
+                try:
+                    arr = np.asarray(val, dtype=float)
+                except Exception:
+                    # fall back to object array if conversion fails
+                    arr = np.atleast_1d(val)
+                items.append((idx, arr))
+        else:
+            # column missing -> empty arrays for each row (keeps index correspondence)
+            for idx in df.index:
+                items.append((idx, np.array([], dtype=float)))
+        mode_lists[i] = items
+
+    return {"mode_series": mode_series, "mode_lists": mode_lists}
+
+def condense_by_min_abs(data):
+    """
+    Condense each tuple (idx_group, combo, array) into
+    (idx_group, combo, value) where value is the element with the smallest
+    absolute magnitude, but preserve its original sign.
+    """
+    condensed = []
+    for idx_group, combo, arr in data:
+        # choose element with smallest abs() but keep real sign
+        min_val = min(arr, key=lambda x: abs(x))
+        condensed.append((idx_group, combo, min_val))
+    return condensed
+
+def filter_by_max_min_abs(data):
+    """
+    Filter condensed tuples so that only those whose stored value has the
+    largest absolute magnitude remain. Original sign preserved.
+    """
+    if not data:
+        return []
+    
+    max_abs = max(abs(t[2]) for t in data)
+    return [t for t in data if abs(t[2]) == max_abs]
+
+
+
+
+def combine_lists(*lists):
+    """
+    Fully general N-dimensional version that only allows
+    element index combinations with unique indices.
+    """
+
+    # Number of lists (N)
+    N = len(lists)
+
+    # Length of the vectors (K)
+    K = len(lists[0][0][1])
+
+    # Collect all distinct original indices
+    keys = [idx for idx, _ in lists[0]]
+
+    # Map each list by idx for fast lookup
+    idx_maps = []
+    for lst in lists:
+        idx_maps.append({idx: arr for idx, arr in lst})
+
+    # Storage for output groups
+    groups = {key: [] for key in keys}
+
+    # Loop over each index group
+    for key in keys:
+
+        # Grab the vector chosen from each list for this group
+        chosen = [idx_maps[m][key] for m in range(N)]
+
+        # Sweep all element-index choices independently
+        for elem_choices in product(range(K), repeat=N):
+
+            # NEW RULE: require all unique indices
+            if len(set(elem_choices)) != N:
+                continue
+
+            # Build output vector element-wise
+            values = np.array([
+                chosen[m][elem_choices[m]]
+                for m in range(N)
+            ])
+
+            # Store tuple
+            groups[key].append(
+                (key, elem_choices, values)
+            )
+
+    return groups
+
+def select_global_max_min_abs(groups, tol=1e-12):
+    """
+    Given a list of lists where each inner list contains tuples
+    (idx_group, combo, value),
+    return all tuples whose |value| equals the maximum absolute value
+    across the entire dataset, allowing for floating-point tolerance.
+    """
+
+    # Flatten everything into one list of tuples
+    all_tuples = [t for group in groups for t in group]
+
+    if not all_tuples:
+        return []
+
+    # Compute global maximum |value|
+    global_max = max(abs(t[2]) for t in all_tuples)
+
+    # Collect all tuples that match this max within tolerance
+    winners = [
+        t for t in all_tuples
+        if abs(abs(t[2]) - global_max) < tol
+    ]
+
+    return winners
