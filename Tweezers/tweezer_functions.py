@@ -765,14 +765,12 @@ def tweezer_combos_full_radial(
 # ...existing code...
 def build_mode_series_and_combinations(df, max_modes=None):
     """
-    Extract per-mode lists of (df_index, eigvec_array) from df.
+    Extract per-mode lists of (tweezed_ions, eigvec_array) from the dataframe.
 
-    Returns a dict with:
-      - mode_series: mapping mode_index -> original pandas Series (unchanged)
-      - mode_lists:  mapping mode_index -> list of tuples (df_index, np.ndarray(eigvec))
-    If max_modes is set, only modes with index < max_modes are returned.
+    Returns:
+      - mode_series  (unchanged)
+      - mode_lists: mode_index -> [(tweezed_tuple, vec), ...]
     """
-
 
     # find Mode{i}_eigvec columns sorted by i
     mode_cols = sorted(
@@ -784,31 +782,37 @@ def build_mode_series_and_combinations(df, max_modes=None):
     if max_modes is not None:
         mode_indices = [i for i in mode_indices if i < int(max_modes)]
 
-    # keep the original Series for convenience
+    # keep the original Series
     mode_series = {i: df[f"Mode{i}_eigvec"] for i in mode_indices}
 
-    # build lists of (original_index, np.array(value)) for each mode
+    # build lists
     mode_lists = {}
     for i in mode_indices:
         col = f"Mode{i}_eigvec"
         items = []
         if col in df.columns:
             for idx in df.index:
+
+                # ✅ grab tweezed-ion configuration from this row
+                tweezed = df.at[idx, "Tweezed ions"]
+
                 val = df.at[idx, col]
-                # convert to a numeric numpy array (works if stored as list/ndarray/scalar)
                 try:
                     arr = np.asarray(val, dtype=float)
                 except Exception:
-                    # fall back to object array if conversion fails
                     arr = np.atleast_1d(val)
-                items.append((idx, arr))
+
+                # ✅ store tweezed tuple instead of df index
+                items.append((tweezed, arr))
         else:
-            # column missing -> empty arrays for each row (keeps index correspondence)
             for idx in df.index:
-                items.append((idx, np.array([], dtype=float)))
+                tweezed = df.at[idx, "Tweezed ions"]
+                items.append((tweezed, np.array([], dtype=float)))
+
         mode_lists[i] = items
 
     return {"mode_series": mode_series, "mode_lists": mode_lists}
+
 
 def condense_by_min_abs(data):
     """
