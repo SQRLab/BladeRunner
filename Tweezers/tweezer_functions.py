@@ -765,7 +765,7 @@ def tweezer_combos_full_radial(
 # ...existing code...
 def build_mode_series_and_combinations(df, max_modes=None):
     """
-    Extract per-mode lists of (tweezed_ions, eigvec_array) from the dataframe.
+    Extract per-mode lists of (tweezed_ions_tuple, eigvec_array) from the dataframe.
 
     Returns:
       - mode_series  (unchanged)
@@ -777,7 +777,9 @@ def build_mode_series_and_combinations(df, max_modes=None):
         [c for c in df.columns if re.match(r"^Mode\d+_eigvec$", c)],
         key=lambda c: int(re.match(r"Mode(\d+)_eigvec$", c).group(1)),
     )
-    mode_indices = [int(re.match(r"Mode(\d+)_eigvec$", c).group(1)) for c in mode_cols]
+    mode_indices = [
+        int(re.match(r"Mode(\d+)_eigvec$", c).group(1)) for c in mode_cols
+    ]
 
     if max_modes is not None:
         mode_indices = [i for i in mode_indices if i < int(max_modes)]
@@ -790,21 +792,27 @@ def build_mode_series_and_combinations(df, max_modes=None):
     for i in mode_indices:
         col = f"Mode{i}_eigvec"
         items = []
+
         if col in df.columns:
             for idx in df.index:
 
-                # ✅ grab tweezed-ion configuration from this row
+                # ✅ Get the tweezed-ion tuple right from the dataframe
                 tweezed = df.at[idx, "Tweezed ions"]
 
+                # extract eigenvector value
                 val = df.at[idx, col]
+
+                # robust array conversion
                 try:
                     arr = np.asarray(val, dtype=float)
                 except Exception:
                     arr = np.atleast_1d(val)
 
-                # ✅ store tweezed tuple instead of df index
+                # ✅ store tuple and vector
                 items.append((tweezed, arr))
+
         else:
+            # mode is missing — still track tweezed config
             for idx in df.index:
                 tweezed = df.at[idx, "Tweezed ions"]
                 items.append((tweezed, np.array([], dtype=float)))
@@ -812,6 +820,7 @@ def build_mode_series_and_combinations(df, max_modes=None):
         mode_lists[i] = items
 
     return {"mode_series": mode_series, "mode_lists": mode_lists}
+
 
 
 def condense_by_min_abs(data):
