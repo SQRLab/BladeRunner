@@ -672,6 +672,7 @@ def tweezer_combos_full_radial(
     mode_calc_r,
     N_list,
     f_rf_r,
+    f_rf_a,
     P_opt,
     w0,
     max_tweezed=1,
@@ -706,7 +707,7 @@ def tweezer_combos_full_radial(
         # RF trap setup
         w_rf_r = f_rf_r * 2 * pi
         w_rf_r_list = np.full(N, w_rf_r)
-        ueq = ion_spacing(N, f_rf_r)[0]
+        ueq = ion_spacing(N, f_rf_a)[0]
 
         # --- Loop over optical powers ---
         for P_total in P_opt:
@@ -762,14 +763,15 @@ def tweezer_combos_full_radial(
                 rows.append(row)
 
     return pd.DataFrame(rows)
-# ...existing code...
+
 def build_mode_series_and_combinations(df, max_modes=None):
     """
-    Extract per-mode lists of (tweezed_ions_tuple, eigvec_array) from the dataframe.
+    Extract per-mode lists of (tweezed_ions, eigvec_array) from the dataframe.
+    Replaces empty tuple `()` (untweezed) with np.nan.
 
     Returns:
       - mode_series  (unchanged)
-      - mode_lists: mode_index -> [(tweezed_tuple, vec), ...]
+      - mode_lists: mode_index -> [(tweezed_placeholder, vec), ...]
     """
 
     # find Mode{i}_eigvec columns sorted by i
@@ -777,9 +779,7 @@ def build_mode_series_and_combinations(df, max_modes=None):
         [c for c in df.columns if re.match(r"^Mode\d+_eigvec$", c)],
         key=lambda c: int(re.match(r"Mode(\d+)_eigvec$", c).group(1)),
     )
-    mode_indices = [
-        int(re.match(r"Mode(\d+)_eigvec$", c).group(1)) for c in mode_cols
-    ]
+    mode_indices = [int(re.match(r"Mode(\d+)_eigvec$", c).group(1)) for c in mode_cols]
 
     if max_modes is not None:
         mode_indices = [i for i in mode_indices if i < int(max_modes)]
@@ -792,34 +792,38 @@ def build_mode_series_and_combinations(df, max_modes=None):
     for i in mode_indices:
         col = f"Mode{i}_eigvec"
         items = []
-
         if col in df.columns:
             for idx in df.index:
 
-                # ✅ Get the tweezed-ion tuple right from the dataframe
+                # grab tweezed-ion configuration from this row
                 tweezed = df.at[idx, "Tweezed ions"]
 
-                # extract eigenvector value
-                val = df.at[idx, col]
+                # replace empty tuple with np.nan
+                if tweezed == ():
+                    tweezed = np.nan
+                elif len(tweezed) == 1:
+                    tweezed = tweezed[0]  # if single-ion tuple, just use the integer
 
-                # robust array conversion
+                val = df.at[idx, col]
                 try:
                     arr = np.asarray(val, dtype=float)
                 except Exception:
                     arr = np.atleast_1d(val)
 
-                # ✅ store tuple and vector
                 items.append((tweezed, arr))
-
         else:
-            # mode is missing — still track tweezed config
             for idx in df.index:
                 tweezed = df.at[idx, "Tweezed ions"]
+                if tweezed == ():
+                    tweezed = np.nan
+                elif len(tweezed) == 1:
+                    tweezed = tweezed[0]
                 items.append((tweezed, np.array([], dtype=float)))
 
         mode_lists[i] = items
 
     return {"mode_series": mode_series, "mode_lists": mode_lists}
+
 
 
 
