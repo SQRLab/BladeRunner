@@ -927,3 +927,122 @@ def select_global_max_min_abs(groups, tol=1e-12):
     ]
 
     return winners
+
+
+def combine_lists_same_index_df(*lists):
+    """
+    N-dimensional version where all lists must pick
+    the SAME component index for each vector.
+
+    Returns a tidy pandas DataFrame.
+    """
+
+    # Number of lists (N)
+    N = len(lists)
+
+    # Length of vectors (K)
+    K = len(lists[0][0][1])
+
+    # Collect all distinct original indices
+    keys = [idx for idx, _ in lists[0]]
+
+    # Map each list by idx for fast lookup
+    idx_maps = []
+    for lst in lists:
+        idx_maps.append({idx: arr for idx, arr in lst})
+
+    # Rows to accumulate for the DataFrame
+    rows = []
+
+    # Loop over each index group
+    for key in keys:
+
+        # Vectors for this index across all input lists
+        chosen = [idx_maps[m][key] for m in range(N)]
+
+        # Sweep SAME element index across all lists
+        for elem in range(K):
+
+            values = np.array([chosen[m][elem] for m in range(N)])
+
+            rows.append({
+                "Tweezed Ion": key,
+                "Coolant Ion": elem,
+            # "elem_indices_tuple": (elem,) * N,
+                "Mode couplings": values
+            })
+
+    # Turn into DataFrame
+    df = pd.DataFrame(rows)
+
+    # add inverse and summed-inverse columns (as requested)
+    df["inverse_mode_couplings"] = df["Mode couplings"].apply(
+        lambda arr: np.array([1/x if x != 0 else np.inf for x in arr])
+    )
+    df["sum_inverse_middle"] = df["inverse_mode_couplings"].apply(
+        lambda lst: sum(x for x in lst if pd.notna(x))
+    )
+
+    return df
+def collect_midcircuit_combined_df(
+    Ns,
+    omega_t,
+    linewidths_,
+    omega_res_,
+    m_,
+    mode_calc,
+    f_rf_r_,
+    f_rf_a_,
+    P_,
+    w0_,
+    return_many_N=False,
+):
+    """
+    Run midcircuit_modes for each N in Ns and return a combined DataFrame.
+    Does NOT print or display per-N results. Keeps all rows (no per-N dedupe).
+    If return_many_N is True, also return the list of (N, per-N DataFrame).
+    """
+    dfs = []
+    many_N = []
+
+    for N in Ns:
+        test_loop = midcircuit_modes(
+            omega_t,
+            linewidths_,
+            omega_res_,
+            m_,
+            mode_calc,
+            N,
+            f_rf_r_,
+            f_rf_a_,
+            P_,
+            w0_,
+        )
+        many_N.append((N, test_loop))
+
+        if isinstance(test_loop, pd.DataFrame) and not test_loop.empty:
+            df = test_loop.copy().reset_index(drop=True)
+            df["N"] = int(N)
+            try:
+                df["Tweezed Ion"] = df["Tweezed Ion"].astype(int)
+            except Exception:
+                pass
+            dfs.append(df)
+
+    if dfs:
+        combined_df = pd.concat(dfs, ignore_index=True, sort=False)
+        cols = [
+            "N",
+            "Tweezed Ion",
+            "Coolant Ion",
+            "Mode couplings",
+            "inverse_mode_couplings",
+            "sum_inverse_middle",
+        ]
+        combined_df = combined_df[[c for c in cols if c in combined_df.columns]]
+    else:
+        combined_df = pd.DataFrame()
+
+    if return_many_N:
+        return combined_df, many_N
+    return combined_df
