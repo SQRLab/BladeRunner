@@ -977,13 +977,161 @@ def combine_lists_same_index_df(*lists):
 
     # add inverse and summed-inverse columns (as requested)
     df["inverse_mode_couplings"] = df["Mode couplings"].apply(
-        lambda arr: np.array([1/x if x != 0 else np.inf for x in arr])
+        lambda arr: np.array([1.0/abs(x) if x != 0 else np.inf for x in arr])
     )
     df["sum_inverse_middle"] = df["inverse_mode_couplings"].apply(
         lambda lst: sum(x for x in lst if pd.notna(x))
     )
 
     return df
+
+
+# ...existing code...
+
+def midcircuit_modes(omega_tweezer,
+                     linewidths,
+                     omega_res,
+                     m,
+                     mode_calc_r,
+                     N,
+                     f_rf_r,
+                     f_rf_a,
+                     P,
+                     w0
+                     ):
+    """
+    Compute combined mode lists for all tweezed configurations for given N.
+    Returns a DataFrame of best rows (keeps all top-scoring rows, removes lower losers).
+    NOTE: Tweezed Ion may equal Coolant Ion (this function allows that).
+    """
+    results = tweezer_combos_full_radial(
+        omega_tweezer,
+        linewidths,
+        omega_res,
+        m,
+        mode_calc_r,
+        N,
+        f_rf_r,
+        f_rf_a,
+        P,
+        w0,
+        max_tweezed=1,
+    )
+    result = build_mode_series_and_combinations(results)
+
+    mode_list_test = []
+    for i in range(len(result) + 1):
+        mode_list_test.append(result["mode_lists"][i])
+
+    middle = combine_lists_same_index_df(*mode_list_test)
+
+    # NOTE: we intentionally allow Tweezed Ion == Coolant Ion here (no filtering).
+
+    # collect best per tweezed-ion group (choose canonical one per group)
+    best_rows = middle.iloc[0:0].copy()
+    tweezed_keys = [k for k in middle["Tweezed Ion"].unique() if pd.notna(k)]
+    for key in tweezed_keys:
+        subset = middle[middle["Tweezed Ion"] == key]
+        if subset.empty:
+            continue
+        # keep subset as-is (allow coolant == tweezed)
+        mn = subset["sum_inverse_middle"].abs().min()
+        mask = np.isclose(subset["sum_inverse_middle"].abs(), mn, rtol=1e-12, atol=1e-12)
+        tied = subset.loc[mask]
+        # pick canonical representative (first by Coolant Ion, NaN last)
+        chosen = tied.sort_values("Coolant Ion", na_position="last").iloc[0:1]
+        best_rows = pd.concat([best_rows, chosen], ignore_index=True)
+
+    # keep only the globally best score(s) across all tweezed groups
+    if best_rows.empty:
+        return best_rows
+
+    global_min = best_rows["sum_inverse_middle"].abs().min()
+    keep_mask = np.isclose(best_rows["sum_inverse_middle"].abs(), global_min, rtol=1e-8, atol=1e-12)
+    final = best_rows.loc[keep_mask].reset_index(drop=True)
+
+    return final
+
+# ...existing code...
+# ...existing code...
+def midcircuit_modes_untweezed(omega_tweezer,
+                     linewidths,
+                     omega_res,
+                     m,
+                     mode_calc_r,
+                     N,
+                     f_rf_r,
+                     f_rf_a,
+                     P,
+                     w0
+                     ):
+    """
+    Untweezed version: use combine_lists_same_index_df_untweezed and pick global best(s).
+    Ensures:
+      - "inverse_mode_couplings" stores 1 / abs(mode_coupling) for each entry
+      - "sum_inverse_middle" is the sum of those inverses for the row
+    """
+    results = tweezer_combos_full_radial(
+        omega_tweezer,
+        linewidths,
+        omega_res,
+        m,
+        mode_calc_r,
+        N,
+        f_rf_r,
+        f_rf_a,
+        P,
+        w0,
+        max_tweezed=0,
+    )
+    result = build_mode_series_and_combinations(results)
+
+    mode_list_test = []
+    for i in range(len(result) + 1):
+        mode_list_test.append(result["mode_lists"][i])
+
+    # use untweezed combiner that does not expect a 'Tweezed Ion' column
+    middle = combine_lists_same_index_df(*mode_list_test)
+
+    if middle.empty:
+        return middle
+
+    # Require "Mode couplings" present
+    if "Mode couplings" not in middle.columns:
+        return middle
+
+    # inverse_mode_couplings = 1 / abs(value) for each entry in Mode couplings
+    def inv_abs_list(arr):
+        # arr may be list-like or numpy array; try to handle mixed/invalid entries robustly
+        try:
+            a = np.array([float(x) for x in arr], dtype=float)
+        except Exception:
+            # fallback: iterate and coerce elementwise (preserve invalid as np.nan)
+            out = []
+            for x in arr:
+                try:
+                    out.append(float(x))
+                except Exception:
+                    out.append(np.nan)
+            a = np.array(out, dtype=float)
+
+        a = np.abs(a)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            inv = np.where(np.isnan(a), np.nan, np.where(a == 0.0, np.inf, 1.0 / a))
+        return inv.astype(float)
+
+    # store the actual inverses of the absolute couplings
+    middle["inverse_mode_couplings"] = middle["Mode couplings"].apply(inv_abs_list)
+
+    # sum_inverse_middle = sum of those inverses (treat NaN as missing, include np.inf if present)
+    middle["sum_inverse_middle"] = middle["inverse_mode_couplings"].apply(lambda arr: float(np.nansum(arr)))
+
+    # select rows with minimal sum_inverse_middle (best candidate(s))
+    global_min = middle["sum_inverse_middle"].abs().min()
+    keep_mask = np.isclose(middle["sum_inverse_middle"].abs(), global_min, rtol=1e-8, atol=1e-12)
+    final = middle.loc[keep_mask].reset_index(drop=True)
+    return final
+
 def collect_midcircuit_combined_df(
     Ns,
     omega_t,
