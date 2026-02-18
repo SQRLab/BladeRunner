@@ -344,13 +344,13 @@ def mode_calc_r(m,omega_r_combined,ueq,N):
     masses = np.array([m for _ in range(N)])
     for i in range(N):
         A[i][i] = (masses[i] * omega_r_combined[i]**2 - coloumb * sum(1 / (ueq[i] - ueq[m])**3 for m in range(0, i))
-           - coloumb * sum(1 / (ueq[m] - ueq[i])**3 for m in range(i + 1, N))) * masses[i]
+           - coloumb * sum(1 / (ueq[m] - ueq[i])**3 for m in range(i + 1, N)))# * masses[i]
         for j in range(0, i):
-            A[i][j] = (1/(ueq[i]-ueq[j])**3) * np.sqrt(masses[i])*np.sqrt(masses[j])*(coloumb)
+            A[i][j] = (1/(ueq[i]-ueq[j])**3) *(coloumb)#* np.sqrt(masses[i])*np.sqrt(masses[j])
         for j in range(i+1, N):
-            A[i][j] = (1/ (ueq[j]-ueq[i])**3) *np.sqrt(masses[i])*np.sqrt(masses[j])*(coloumb)
+            A[i][j] = (1/ (ueq[j]-ueq[i])**3) *(coloumb)#*np.sqrt(masses[i])*np.sqrt(masses[j])
     eigvals, eigvecs = np.linalg.eig(A) # this gives eigenvalues and eigenvectors
-    freqs =( np.sqrt(1*eigvals))/(2*pi*m) #eigenvalue = spring constant k, so freq = sqrt(e-val)/(2*pi*m)
+    freqs =( np.sqrt(1*eigvals/m))/(2*pi) #eigenvalue = spring constant k, so freq = sqrt(e-val)/(2*pi*m)
     
     
     scaledmodes = [(f, v) for f, v in zip(freqs, eigvecs.T)]
@@ -382,14 +382,14 @@ def mode_calc_a(m,omega_a_combined,ueq,N):
     masses = np.array([m for _ in range(N)])
     for i in range(N):
         A[i][i] = (masses[i] * omega_a_combined[i]**2 + coloumb * sum(2 / (ueq[i] - ueq[m])**3 for m in range(0, i))
-           + coloumb * sum(2 / (ueq[m] - ueq[i])**3 for m in range(i + 1, N))) * masses[i]
+           + coloumb * sum(2 / (ueq[m] - ueq[i])**3 for m in range(i + 1, N)))# * masses[i]
         for j in range(0, i):
-            A[i][j] = (-2/(ueq[i]-ueq[j])**3) * np.sqrt(masses[i])*np.sqrt(masses[j])*(coloumb)
+            A[i][j] = (-2/(ueq[i]-ueq[j])**3) *(coloumb)#* np.sqrt(masses[i])*np.sqrt(masses[j])
         for j in range(i+1, N):
-            A[i][j] = (-2/ (ueq[j]-ueq[i])**3) *np.sqrt(masses[i])*np.sqrt(masses[j])*(coloumb)
+            A[i][j] = (-2/ (ueq[j]-ueq[i])**3)*(coloumb)# *np.sqrt(masses[i])*np.sqrt(masses[j])
 
     eigvals, eigvecs = np.linalg.eig(A) # this gives eigenvalues and eigenvectors
-    freqs =( np.sqrt(1*eigvals))/(2*pi*m) #eigenvalue = spring constant k, so freq = sqrt(e-val)/(2*pi*m)
+    freqs =( np.sqrt(1*eigvals/m))/(2*pi) #eigenvalue = spring constant k, so freq = sqrt(e-val)/(2*pi*m)
 
     scaledmodes = [(f, v) for f, v in zip(freqs, eigvecs.T)]
     scaledmodes = sorted(scaledmodes, key=lambda mode: mode[0],reverse=False)
