@@ -790,66 +790,50 @@ def tweezer_combos_full_radial(
 
 def build_mode_series_and_combinations(df, max_modes=None):
     """
-    Extract per-mode lists of (tweezed_ions, eigvec_array) from the dataframe.
-    Replaces empty tuple `()` (untweezed) with np.nan.
+    Inputs:
+    df: dataframe constructed from tweezer_combos_full_radial
 
     Returns:
-      - mode_series  (unchanged)
-      - mode_lists: mode_index -> [(tweezed_placeholder, vec), ...]
+    dictionary of {"mode_series": mode_series, "mode_lists": mode_lists} where:
+        mode_series = {i:df["Mode{i}_eigvec"] for i in mode_indices}
+        mode_lists = {i: list of tuples (tweezed_ions, eigvec_array)}
     """
 
     # find Mode{i}_eigvec columns sorted by i
+    # Mode 0 is always the center of mass mode
     mode_cols = sorted(
         [c for c in df.columns if re.match(r"^Mode\d+_eigvec$", c)],
         key=lambda c: int(re.match(r"Mode(\d+)_eigvec$", c).group(1)),
     )
     mode_indices = [int(re.match(r"Mode(\d+)_eigvec$", c).group(1)) for c in mode_cols]
-
-    if max_modes is not None:
-        mode_indices = [i for i in mode_indices if i < int(max_modes)]
-
-    # keep the original Series
+    
+    # makes a dictionary to map mode index to the original dataframe column
+    #if you want to speed up the code, consider doing this in a different manner
     mode_series = {i: df[f"Mode{i}_eigvec"] for i in mode_indices}
 
-    # build lists
+    # Loop through all rows of df and get the ruples of (tweezed_ions, eigvec_array)
+    # Results are stored in a dictionary
     mode_lists = {}
     for i in mode_indices:
         col = f"Mode{i}_eigvec"
         items = []
-        if col in df.columns:
-            for idx in df.index:
-
-                # grab tweezed-ion configuration from this row
-                tweezed = df.at[idx, "Tweezed ions"]
-
-                # replace empty tuple with np.nan
-                if tweezed == ():
-                    tweezed = np.nan
-                elif len(tweezed) == 1:
-                    tweezed = tweezed[0]  # if single-ion tuple, just use the integer
-
-                val = df.at[idx, col]
-                try:
-                    arr = np.asarray(val, dtype=float)
-                except Exception:
-                    arr = np.atleast_1d(val)
-
-                items.append((tweezed, arr))
-        else:
-            for idx in df.index:
-                tweezed = df.at[idx, "Tweezed ions"]
-                if tweezed == ():
-                    tweezed = np.nan
-                elif len(tweezed) == 1:
-                    tweezed = tweezed[0]
-                items.append((tweezed, np.array([], dtype=float)))
-
+        for idx in df.index:
+            # get tweezed-ion configuration, basically turn () into nan, and (i,) into i
+            tweezed = df.at[idx, "Tweezed ions"]
+            # replace empty tuple with np.nan
+            if tweezed == ():
+                tweezed = np.nan
+            elif len(tweezed) == 1:
+                tweezed = tweezed[0]  # if single-ion tuple, just use the integer
+            val = df.at[idx, col]
+            try:
+                arr = np.asarray(val, dtype=float)
+            except Exception:
+                arr = np.atleast_1d(val)
+            items.append((tweezed, arr))
         mode_lists[i] = items
 
     return {"mode_series": mode_series, "mode_lists": mode_lists}
-
-
-
 
 def condense_by_min_abs(data):
     """
@@ -874,9 +858,6 @@ def filter_by_max_min_abs(data):
     
     max_abs = max(abs(t[2]) for t in data)
     return [t for t in data if abs(t[2]) == max_abs]
-
-
-
 
 def combine_lists(*lists):
     """
@@ -952,7 +933,6 @@ def select_global_max_min_abs(groups, tol=1e-12):
 
     return winners
 
-
 def combine_lists_same_index_df(*lists):
     """
     N-dimensional version where all lists must pick
@@ -1008,9 +988,6 @@ def combine_lists_same_index_df(*lists):
     )
 
     return df
-
-
-# ...existing code...
 
 def midcircuit_modes(omega_tweezer,
                      linewidths,
@@ -1076,8 +1053,6 @@ def midcircuit_modes(omega_tweezer,
 
     return final
 
-# ...existing code...
-# ...existing code...
 def midcircuit_modes_untweezed(omega_tweezer,
                      linewidths,
                      omega_res,
