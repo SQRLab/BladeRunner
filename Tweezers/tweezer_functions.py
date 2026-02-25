@@ -676,6 +676,7 @@ def tweezer_combos_full_radial(
     P_opt,
     w0,
     max_tweezed=1,
+    qubit_lambda = 729e-9
 ):
     """
     Inputs:
@@ -690,6 +691,7 @@ def tweezer_combos_full_radial(
     f_rf_a = axial rf trapping frequency [Hz]
     P_opt = list of total optical power of tweezer laser beam to loop over (can also be a single number) [W]
     w0 = beamwaist of the tweezer laser beam [m] 
+    qubit_lambda = wavelength of qubit transition [m] (729e-9 for 40Ca+)
 
     Outputs:
     DataFrame with columns:
@@ -711,6 +713,9 @@ def tweezer_combos_full_radial(
     #defining pi as just pi because I use it a lot 
     pi = np.pi
     rows = []
+    # compute k from provided qubit wavelength 
+    k = 2.0 * pi / qubit_lambda
+    eigvec_scale = k * np.sqrt(hbar / (2.0 * m))
 
     # Looping over number of ions, N
     for N in N_list:
@@ -772,13 +777,16 @@ def tweezer_combos_full_radial(
                     # creating columns for all possible modes, if that N doesn't have those modes
                     # then fill it in with NaN
                     if mode_index < len(freqs):
+                        freq_val = float(freqs[mode_index])
                         row[f"Mode{mode_index}_freq"] = float(freqs[mode_index])
                     else:
                         row[f"Mode{mode_index}_freq"] = np.nan
 
                     # eigenvector (length N) or NaN array
                     if mode_index < eigvecs.shape[0]:
-                        row[f"Mode{mode_index}_eigvec"] = np.ravel(eigvecs[mode_index]).astype(float)
+                        omega_mode = 2.0 * pi * freq_val
+                        scale = eigvec_scale * np.sqrt(1.0 / omega_mode)
+                        row[f"Mode{mode_index}_eigvec"] = (scale * np.ravel(eigvecs[mode_index])).astype(float)
                     else:
                         # use full-length nan array to keep shape consistent
                         row[f"Mode{mode_index}_eigvec"] = np.full(N, np.nan, dtype=float)
@@ -788,7 +796,7 @@ def tweezer_combos_full_radial(
 
     return pd.DataFrame(rows)
 
-def build_mode_series_and_combinations(df, max_modes=None):
+def build_mode_series_and_combinations(df):
     """
     Inputs:
     df: dataframe constructed from tweezer_combos_full_radial
@@ -806,7 +814,7 @@ def build_mode_series_and_combinations(df, max_modes=None):
         key=lambda c: int(re.match(r"Mode(\d+)_eigvec$", c).group(1)),
     )
     mode_indices = [int(re.match(r"Mode(\d+)_eigvec$", c).group(1)) for c in mode_cols]
-    
+
     # makes a dictionary to map mode index to the original dataframe column
     #if you want to speed up the code, consider doing this in a different manner
     mode_series = {i: df[f"Mode{i}_eigvec"] for i in mode_indices}
@@ -837,9 +845,7 @@ def build_mode_series_and_combinations(df, max_modes=None):
 
 def condense_by_min_abs(data):
     """
-    Condense each tuple (idx_group, combo, array) into
-    (idx_group, combo, value) where value is the element with the smallest
-    absolute magnitude, but preserve its original sign.
+    takes output from "combine lists"
     """
     condensed = []
     for idx_group, combo, arr in data:
@@ -865,10 +871,9 @@ def combine_lists(*lists):
     element index combinations with unique indices.
     """
 
-    # Number of lists (N)
+    # Get the number of ions from the length of the input lists
     N = len(lists)
-
-    # Length of the vectors (K)
+    # Get the number of modes from the length of the eigenvector arrays in the lists
     K = len(lists[0][0][1])
 
     # Collect all distinct original indices
