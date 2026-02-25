@@ -678,67 +678,87 @@ def tweezer_combos_full_radial(
     max_tweezed=1,
 ):
     """
-    Compute all tweezer combinations and corresponding radial mode frequencies,
-    including power dependence and tweezed/untweezed mode separation.
+    Inputs:
+    omega_tweezer = optical tweezer beam angular frequency [2*Pi x Hz]
+    linewidths = linewidth of the given resonant transition taken from NIST database in angular frequency units 
+        (ex, S1/2 to P1/2 and S1/2 to P3/2 for 40Ca+) 
+    omega_res = angular frequency of resonant transition, also based off NIST data [2*Pi x Hz]
+    m = mass of ion [kg]
+    mode_calc_r = function from above to calculate radial modes
+    N_list = list of number of ions to loop over (can also be a single integer)
+    f_rf_r = radial rf trapping frequency [Hz]
+    f_rf_a = axial rf trapping frequency [Hz]
+    P_opt = list of total optical power of tweezer laser beam to loop over (can also be a single number) [W]
+    w0 = beamwaist of the tweezer laser beam [m] 
 
-    mode_calc_r is expected to return a list of tuples:
-        [(freq1, eigvec1), (freq2, eigvec2), ...]
-    This version ensures the dataframe has Mode0_eigvec, Mode1_eigvec, ... Mode{N-1}_eigvec
-    and Mode0_freq, Mode1_freq, ... Mode{N-1}_freq for each row (missing entries filled with NaN).
+    Outputs:
+    DataFrame with columns:
+    - N: number of ions
+    - Tweezed ions: tuple of which ions are tweezed
+    - P_per_tweezer (W): power per tweezer in this configuration
+    - Combined radial frequencies: array of combined radial frequencies for each ion in this configuration
+    - Mode{i}_freq: frequency of mode i in this configuration (NaN if mode i does not exist for this N)
+    - Mode{i}_eigvec: eigenvector of mode i in this configuration (NaN array if mode i does not exist for this N)
     """
 
 
-    # --- Normalize inputs ---
+    # Making sure N and P are lists because the rest of the code needs them to be lists
     if np.isscalar(N_list):
         N_list = [int(N_list)]
     if np.isscalar(P_opt):
         P_opt = [P_opt]
 
+    #defining pi as just pi because I use it a lot 
     pi = np.pi
     rows = []
 
-    # --- Loop over number of ions ---
+    # Looping over number of ions, N
     for N in N_list:
         # Generate all possible tweezer combinations, but only over the first N/2 ions
+        # Tweezing ions in the second half of the chain should be symmetric to the first half
         half_range = N // 2
-        # ensure max_tweezed does not exceed available positions in the half-range
+        # MAke sure max_tweezed does not exceed available positions in the N/2 range
         max_tweezed_local = min(max_tweezed, half_range)
         all_combos = []
+        # Create the possible subsets of ions tweezed.  
+        # max_tweezed = 1 so this normally just places the tweezer beam at every position
+        # in the N/2 range
         for r in range(0, max_tweezed_local + 1):
             all_combos.extend(itertools.combinations(range(half_range), r))
 
-        # RF trap setup
+        # Setting up the rf-harmonic trap parameters for later
         w_rf_r = f_rf_r * 2 * pi
         w_rf_r_list = np.full(N, w_rf_r)
-        ueq = ion_spacing(N, f_rf_a)[0]
+        ueq = ion_spacing(N, 2*pi*f_rf_a)[0]
 
-        # --- Loop over optical powers ---
+        # Looping over optical tweezer powers, P_opt
         for P_total in P_opt:
+            #looping over where the tweezer placement is, determined above in all_combos
             for tweezed_positions in all_combos:
+                # If max_tweezed =/= 1, this divides total power equally amongst every tweezer
                 n_tweezed = len(tweezed_positions)
                 P_per = P_total / n_tweezed if n_tweezed > 0 else 0.0
 
-                # Compute tweezer potential for this configuration
+                # Compute tweezer potential and tweezer trap frequency for this configuration
                 pot = potential(omega_tweezer, linewidths, omega_res, P_per, w0)
                 w_tw_r = omega_tweezer_r(pot, w0, m)
 
                 # Combine tweezed and untweezed radial frequencies
+                # Here we are combining the tweezer radial frequency with the rf radial frequency
                 combo = np.array([
                     np.sqrt(w_tw_r**2 + w_rf_r_list[i]**2) if i in tweezed_positions else w_rf_r_list[i]
                     for i in range(N)
                 ])
 
-                # --- Compute radial modes ---
+                # Finding radial modes from the combined frequencies, and the e-vecs and e-values
                 modes = mode_calc_r(m, combo, ueq, N)
-
-                # Extract frequencies and eigenvectors
                 freqs = np.array([f for f, v in modes], dtype=float) if len(modes) else np.array([], dtype=float)
                 if len(modes):
                     eigvecs = np.vstack([np.ravel(v) for f, v in modes])  # shape (n_modes, N)
                 else:
                     eigvecs = np.empty((0, N))
 
-                # --- Initialize row with shared info ---
+                # Build the dataframe for the output of this configuration
                 row = {
                     "N": N,
                     "Tweezed ions": tweezed_positions,
@@ -746,10 +766,11 @@ def tweezer_combos_full_radial(
                     "Combined radial frequencies": combo,
                 }
 
-                # --- Ensure columns for all possible modes up to N exist per row ---
+                # Making sure the overall dataframe has the same number of columns for each N
                 # Fill Mode{i}_freq and Mode{i}_eigvec for i in [0, N-1]
                 for mode_index in range(N):
-                    # frequency
+                    # creating columns for all possible modes, if that N doesn't have those modes
+                    # then fill it in with NaN
                     if mode_index < len(freqs):
                         row[f"Mode{mode_index}_freq"] = float(freqs[mode_index])
                     else:
