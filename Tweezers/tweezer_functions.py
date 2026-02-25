@@ -699,10 +699,13 @@ def tweezer_combos_full_radial(
 
     # --- Loop over number of ions ---
     for N in N_list:
-        # Generate all possible tweezer combinations
+        # Generate all possible tweezer combinations, but only over the first N/2 ions
+        half_range = N // 2
+        # ensure max_tweezed does not exceed available positions in the half-range
+        max_tweezed_local = min(max_tweezed, half_range)
         all_combos = []
-        for r in range(0, max_tweezed + 1):
-            all_combos.extend(itertools.combinations(range(N), r))
+        for r in range(0, max_tweezed_local + 1):
+            all_combos.extend(itertools.combinations(range(half_range), r))
 
         # RF trap setup
         w_rf_r = f_rf_r * 2 * pi
