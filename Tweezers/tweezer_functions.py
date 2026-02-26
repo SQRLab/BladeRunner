@@ -1,3 +1,5 @@
+import math
+
 from scipy import constants
 import numpy as np
 from IonChainTools import calcPositions,lengthScale
@@ -845,7 +847,9 @@ def build_mode_series_and_combinations(df):
 
 def condense_by_min_abs(data):
     """
-    takes output from "combine lists"
+    input: output from "combine lists"
+
+    output: [(tweezed ion),(ion-to-mode config),minimum absolute value of mode-participation from that config]
     """
     condensed = []
     for idx_group, combo, arr in data:
@@ -856,19 +860,30 @@ def condense_by_min_abs(data):
 
 def filter_by_max_min_abs(data):
     """
-    Filter condensed tuples so that only those whose stored value has the
-    largest absolute magnitude remain. Original sign preserved.
+    Input: output from condense by min abs
+
+    Output: [(tweezed ion),(ion-to-mode config),maximum of all minimum absolute values of mode-participation]
+                this output is one tuple for a tweezed ion 
     """
     if not data:
         return []
     
+    #find the maximum value across each ion to mode config per a tweezed ion 
     max_abs = max(abs(t[2]) for t in data)
     return [t for t in data if abs(t[2]) == max_abs]
 
 def combine_lists(*lists):
     """
-    Fully general N-dimensional version that only allows
-    element index combinations with unique indices.
+    For use inside run optimal mode selection.
+    Generates all index combinations across all ions and all modes
+    only keeping combinations with unique indices (ie, no two modes can pick the same ion).
+    Input:
+        lists: a list of tuples [(tweezed_ion_config,eigenvector array)],one list per mode
+    
+    Outputs:
+    A dictionary mapping each tweezed ion configuration to a list of tuples:
+        {Tweezed Ion: 
+            [Tweezed Ion,(ion-to-mode mapping), array of corresponding mode-coupling values]}
     """
 
     # Get the number of ions from the length of the input lists
@@ -876,31 +891,29 @@ def combine_lists(*lists):
     # Get the number of modes from the length of the eigenvector arrays in the lists
     K = len(lists[0][0][1])
 
-    # Collect all distinct original indices
+    # Collect all indices of tweezed ion 
     keys = [idx for idx, _ in lists[0]]
 
-    # Map each list by idx for fast lookup
+    # Converts list to dictionary because it apparently has a faster lookup time
     idx_maps = []
     for lst in lists:
         idx_maps.append({idx: arr for idx, arr in lst})
-
-    # Storage for output groups
     groups = {key: [] for key in keys}
 
-    # Loop over each index group
+    # Loop over each tweezed ion configuration
     for key in keys:
 
-        # Grab the vector chosen from each list for this group
+        # gathering eig-vecs for this tweezed ion across all modes
         chosen = [idx_maps[m][key] for m in range(N)]
 
-        # Sweep all element-index choices independently
+        # Creating all index combinations of every ion to every mode without repeating modes/ions
         for elem_choices in product(range(K), repeat=N):
 
-            # NEW RULE: require all unique indices
+            # Setting unique indices
             if len(set(elem_choices)) != N:
                 continue
 
-            # Build output vector element-wise
+            # Build combined vector element-wise
             values = np.array([
                 chosen[m][elem_choices[m]]
                 for m in range(N)
@@ -937,6 +950,92 @@ def select_global_max_min_abs(groups, tol=1e-12):
     ]
 
     return winners
+
+def run_optimal_mode_selection_tweezed_only(
+    omega_tweezer,
+    linewidths,
+    omega_res,
+    m,
+    mode_calc_r,
+    N,
+    f_rf_r,
+    f_rf_a,
+    P_opt,
+    w0,
+    max_tweezed=1
+):
+    """
+    Inputs:
+    omega_tweezer = optical tweezer beam angular frequency [2*Pi x Hz]
+    linewidths = linewidth of the given resonant transition taken from NIST database in angular frequency units 
+        (ex, S1/2 to P1/2 and S1/2 to P3/2 for 40Ca+) 
+    omega_res = angular frequency of resonant transition, also based off NIST data [2*Pi x Hz]
+    m = mass of ion [kg]
+    mode_calc_r = function from above to calculate radial modes
+    N_list = list of number of ions to loop over (can also be a single integer)
+    f_rf_r = radial rf trapping frequency [Hz]
+    f_rf_a = axial rf trapping frequency [Hz]
+    P_opt = list of total optical power of tweezer laser beam to loop over (can also be a single number) [W]
+    w0 = beamwaist of the tweezer laser beam [m] 
+    
+    Returns:
+    A list of tuples
+        [ (tweezed ion, (mode mapping), (corresponding mode-coupling contributions per ion)
+                , P_opt) ]
+    """
+    
+    # 1. Build Lamb-Dicke parameter lists for all configurations
+    df = tweezer_combos_full_radial(
+        omega_tweezer, linewidths, omega_res, m,
+        mode_calc_r, N, f_rf_r, f_rf_a, P_opt, w0,
+        max_tweezed=max_tweezed
+    )
+    
+    result = build_mode_series_and_combinations(df)
+    mode_lists_dict = result["mode_lists"]
+    
+    # Get rid of all Nan and None keys that correspond to no tweezed ions
+    cleaned = {
+        k: v for k, v in mode_lists_dict.items()
+        if k is not None and not (isinstance(k, float) and math.isnan(k)) and k != ()
+    }
+    mode_lists_dict = cleaned
+    
+    if not mode_lists_dict:
+        return []
+    
+    # 2. Sort mode indices and collect all mode lists
+    mode_indices = sorted(
+        mode_lists_dict.keys(),
+        key=lambda x: (str(x) if isinstance(x, tuple) else x)
+    )
+    mode_lists_ordered = [mode_lists_dict[i] for i in mode_indices]
+    
+    # 3. Combine modes across all tweezed ions
+    combos = combine_lists(*mode_lists_ordered)
+    
+    # 4. Condense by min(abs)
+    condensed = {k: condense_by_min_abs(v) for k, v in combos.items()}
+    
+    # 5. Filter by max(min(abs)) within each group
+    best_each = {k: filter_by_max_min_abs(v) for k, v in condensed.items()}
+    
+    # 6. Select global winners
+    winners = select_global_max_min_abs(list(best_each.values()))
+
+    # 7. Compute best ion/mode indices properly
+    augmented = []
+    for tweezed_ion, mapping, score in winners:
+        # Access the corresponding values from combos
+        combo_dict = {combo_indices: arr for _, combo_indices, arr in combos[tweezed_ion]}
+        full_lamb_dicke_vector = combo_dict.get(mapping, np.array(mapping))  
+    
+        #adding P_opt back to the tuple 
+        augmented.append(
+        ((tweezed_ion, mapping, score, P_opt, full_lamb_dicke_vector))  
+        )
+
+    return augmented
 
 def combine_lists_same_index_df(*lists):
     """
