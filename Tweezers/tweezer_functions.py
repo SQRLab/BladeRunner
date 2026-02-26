@@ -1126,8 +1126,7 @@ def run_optimal_mode_selection_untweezed_only(
 
         augmented.append(
             (
-                (tweezed_ion, mapping, score, P_opt, full_lamb_dicke_vector),
-                (worst_ion_index, worst_mode_index)
+                (tweezed_ion, mapping, score, P_opt, full_lamb_dicke_vector)
             )
         )
 
@@ -1146,12 +1145,25 @@ def run_optimal_mode_selection_tweezed_power_sweep(
     w0,
     max_tweezed=1
 ):
+    
     """
-    Sweep over a list of powers and run optimal mode selection
-    for tweezed configurations only using run_optimal_mode_selection_tweezed_only.
-
+    Inputs:
+    omega_tweezer = optical tweezer beam angular frequency [2*Pi x Hz]
+    linewidths = linewidth of the given resonant transition taken from NIST database in angular frequency units 
+        (ex, S1/2 to P1/2 and S1/2 to P3/2 for 40Ca+) 
+    omega_res = angular frequency of resonant transition, also based off NIST data [2*Pi x Hz]
+    m = mass of ion [kg]
+    mode_calc_r = function from above to calculate radial modes
+    N_list = list of number of ions to loop over (can also be a single integer)
+    f_rf_r = radial rf trapping frequency [Hz]
+    f_rf_a = axial rf trapping frequency [Hz]
+    P_opt = list of total optical power of tweezer laser beam to loop over (can also be a single number) [W]
+    w0 = beamwaist of the tweezer laser beam [m] 
+    
     Returns:
-        power_results: list of tuples [(P_opt, winners), ...]
+    A list of tuples
+        [ (tweezed ion, (mode mapping), (corresponding mode-coupling contributions per ion)
+                , P_opt) ]
     """
     power_results = []
 
@@ -1169,8 +1181,7 @@ def run_optimal_mode_selection_tweezed_power_sweep(
             w0,
             max_tweezed=max_tweezed
         )
-        power_results.append((P_opt, winners))
-
+        power_results.append(winners)
     return power_results
 
 def combine_lists_same_index_df(*lists):
@@ -1181,16 +1192,16 @@ def combine_lists_same_index_df(*lists):
     Returns a tidy pandas DataFrame.
     """
 
-    # Number of lists (N)
+    # Get the number of modes from the length of the lists
     N = len(lists)
 
-    # Length of vectors (K)
+    # Get the number of ions from the length of the eig-vec 
     K = len(lists[0][0][1])
 
-    # Collect all distinct original indices
+    # Collect one index at a time 
     keys = [idx for idx, _ in lists[0]]
 
-    # Map each list by idx for fast lookup
+    # Converts list to dictionary because it apparently has a faster lookup time
     idx_maps = []
     for lst in lists:
         idx_maps.append({idx: arr for idx, arr in lst})
@@ -1241,10 +1252,28 @@ def midcircuit_modes(omega_tweezer,
                      w0
                      ):
     """
-    Compute combined mode lists for all tweezed configurations for given N.
-    Returns a DataFrame of best rows (keeps all top-scoring rows, removes lower losers).
-    NOTE: Tweezed Ion may equal Coolant Ion (this function allows that).
+    Inputs:
+    omega_tweezer = optical tweezer beam angular frequency [2*Pi x Hz]
+    linewidths = linewidth of the given resonant transition taken from NIST database in angular frequency units 
+        (ex, S1/2 to P1/2 and S1/2 to P3/2 for 40Ca+) 
+    omega_res = angular frequency of resonant transition, also based off NIST data [2*Pi x Hz]
+    m = mass of ion [kg]
+    mode_calc_r = function from above to calculate radial modes
+    N_list = list of number of ions to loop over (can also be a single integer)
+    f_rf_r = radial rf trapping frequency [Hz]
+    f_rf_a = axial rf trapping frequency [Hz]
+    P_opt = list of total optical power of tweezer laser beam to loop over (can also be a single number) [W]
+    w0 = beamwaist of the tweezer laser beam [m] 
+    
+    Returns:
+    dataframe with columns:
+    - "Tweezed Ion": which ion is tweezed in this configuration (NaN/None if no tweezed ion) (int)
+    - "Coolant Ion": which ion is the best coolant candidate for this configuration (int)
+    - "Mode couplings": array of mode coupling values for the coolant ion in this configuration (numpy array)
+    - "inverse_mode_couplings": array of 1/abs(mode coupling) (numpy array)
+    - "sum_inverse_middle": sum of the inverse_mode_couplings for this row (float)
     """
+    # get all mode strucures for all possible tweezed ion positions
     results = tweezer_combos_full_radial(
         omega_tweezer,
         linewidths,
@@ -1258,32 +1287,43 @@ def midcircuit_modes(omega_tweezer,
         w0,
         max_tweezed=1,
     )
+    # build the mode lists
     result = build_mode_series_and_combinations(results)
-
     mode_list_test = []
     for i in range(len(result) + 1):
         mode_list_test.append(result["mode_lists"][i])
 
+    # make a data frame for the all modes from one ion across every ion for every tweezer configuration
     middle = combine_lists_same_index_df(*mode_list_test)
 
-    # NOTE: we intentionally allow Tweezed Ion == Coolant Ion here (no filtering).
-
-    # collect best per tweezed-ion group (choose canonical one per group)
+    # Filter the dataframe to pick only the best ion to cool and the best ion to tweeze 
     best_rows = middle.iloc[0:0].copy()
     tweezed_keys = [k for k in middle["Tweezed Ion"].unique() if pd.notna(k)]
+
     for key in tweezed_keys:
         subset = middle[middle["Tweezed Ion"] == key]
         if subset.empty:
             continue
-        # keep subset as-is (allow coolant == tweezed)
-        mn = subset["sum_inverse_middle"].abs().min()
-        mask = np.isclose(subset["sum_inverse_middle"].abs(), mn, rtol=1e-12, atol=1e-12)
-        tied = subset.loc[mask]
-        # pick canonical representative (first by Coolant Ion, NaN last)
-        chosen = tied.sort_values("Coolant Ion", na_position="last").iloc[0:1]
-        best_rows = pd.concat([best_rows, chosen], ignore_index=True)
+        
+        # First, considering Coolant Ion == Tweezed Ion and finding the smallest sum_inverse_middle
+        subset_same = subset[subset["Coolant Ion"] == key]
+        if not subset_same.empty:
+            mn_same = subset_same["sum_inverse_middle"].abs().min()
+            mask_same = np.isclose(subset_same["sum_inverse_middle"].abs(), mn_same, rtol=1e-12, atol=1e-12)
+            tied_same = subset_same.loc[mask_same]
+            chosen_same = tied_same.sort_values("Coolant Ion", na_position="last").iloc[0:1]
+            best_rows = pd.concat([best_rows, chosen_same], ignore_index=True)
+        
+        # Next, considering coolant ion =/= tweezed ion and finding the smallest sum_inverse_middle
+        subset_diff = subset[subset["Coolant Ion"] != key]
+        if not subset_diff.empty:
+            mn_diff = subset_diff["sum_inverse_middle"].abs().min()
+            mask_diff = np.isclose(subset_diff["sum_inverse_middle"].abs(), mn_diff, rtol=1e-12, atol=1e-12)
+            tied_diff = subset_diff.loc[mask_diff]
+            chosen_diff = tied_diff.sort_values("Coolant Ion", na_position="last").iloc[0:1]
+            best_rows = pd.concat([best_rows, chosen_diff], ignore_index=True)
 
-    # keep only the globally best score(s) across all tweezed groups
+    # Pick the winner across both cases, lowest sum_inverse_middle
     if best_rows.empty:
         return best_rows
 
@@ -1304,11 +1344,27 @@ def midcircuit_modes_untweezed(omega_tweezer,
                      P,
                      w0
                      ):
-    """
-    Untweezed version: use combine_lists_same_index_df_untweezed and pick global best(s).
-    Ensures:
-      - "inverse_mode_couplings" stores 1 / abs(mode_coupling) for each entry
-      - "sum_inverse_middle" is the sum of those inverses for the row
+  """
+    Inputs:
+    omega_tweezer = optical tweezer beam angular frequency [2*Pi x Hz]
+    linewidths = linewidth of the given resonant transition taken from NIST database in angular frequency units 
+        (ex, S1/2 to P1/2 and S1/2 to P3/2 for 40Ca+) 
+    omega_res = angular frequency of resonant transition, also based off NIST data [2*Pi x Hz]
+    m = mass of ion [kg]
+    mode_calc_r = function from above to calculate radial modes
+    N_list = list of number of ions to loop over (can also be a single integer)
+    f_rf_r = radial rf trapping frequency [Hz]
+    f_rf_a = axial rf trapping frequency [Hz]
+    P_opt = list of total optical power of tweezer laser beam to loop over (can also be a single number) [W]
+    w0 = beamwaist of the tweezer laser beam [m] 
+    
+    Returns:
+    dataframe with columns:
+    - "Tweezed Ion": Always Nan or None here
+    - "Coolant Ion": which ion is the best coolant candidate for this configuration (int)
+    - "Mode couplings": array of mode coupling values for the coolant ion in this configuration (numpy array)
+    - "inverse_mode_couplings": array of 1/abs(mode coupling) (numpy array)
+    - "sum_inverse_middle": sum of the inverse_mode_couplings for this row (float)
     """
     results = tweezer_combos_full_radial(
         omega_tweezer,
