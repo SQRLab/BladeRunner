@@ -1037,6 +1037,142 @@ def run_optimal_mode_selection_tweezed_only(
 
     return augmented
 
+def run_optimal_mode_selection_untweezed_only(
+    omega_tweezer,
+    linewidths,
+    omega_res,
+    m,
+    mode_calc_r,
+    N,
+    f_rf_r,
+    f_rf_a,
+    P_opt,
+    w0
+):
+    """
+    Inputs:
+    omega_tweezer = optical tweezer beam angular frequency [2*Pi x Hz]
+    linewidths = linewidth of the given resonant transition taken from NIST database in angular frequency units 
+        (ex, S1/2 to P1/2 and S1/2 to P3/2 for 40Ca+) 
+    omega_res = angular frequency of resonant transition, also based off NIST data [2*Pi x Hz]
+    m = mass of ion [kg]
+    mode_calc_r = function from above to calculate radial modes
+    N_list = list of number of ions to loop over (can also be a single integer)
+    f_rf_r = radial rf trapping frequency [Hz]
+    f_rf_a = axial rf trapping frequency [Hz]
+    P_opt = list of total optical power of tweezer laser beam to loop over (can also be a single number) [W]
+    w0 = beamwaist of the tweezer laser beam [m] 
+    
+    Returns:
+    A list of tuples
+        [ (tweezed ion, (mode mapping), (corresponding mode-coupling contributions per ion)
+                , P_opt) ]
+    """
+    
+    # 1. Build Lamb-Dicke parameter lists for the untweezed configuration
+    df = tweezer_combos_full_radial(
+        omega_tweezer, linewidths, omega_res, m,
+        mode_calc_r, N, f_rf_r, f_rf_a, P_opt, w0,
+        max_tweezed=0
+    )
+    
+    result = build_mode_series_and_combinations(df)
+    mode_lists_dict = result["mode_lists"]
+    
+    # ---- CLEAN: remove unusable keys ----
+    cleaned = {
+        k: v for k, v in mode_lists_dict.items()
+        if k is not None and not (isinstance(k, float) and math.isnan(k)) and k != ()
+    }
+    mode_lists_dict = cleaned
+    
+    if not mode_lists_dict:
+        return []
+    
+    # 2. Sort mode indices numerically if possible
+    mode_indices = sorted(
+        mode_lists_dict.keys(),
+        key=lambda x: (str(x) if isinstance(x, tuple) else x)
+    )
+    
+    if not mode_indices:
+        return []
+    
+    # 3. Collect lists in canonical order
+    mode_lists_ordered = [mode_lists_dict[i] for i in mode_indices]
+    
+    # 4. Combine modes
+    combos = combine_lists(*mode_lists_ordered)
+    
+    # 5. Condense by min(abs)
+    condensed = {k: condense_by_min_abs(v) for k, v in combos.items()}
+    
+    # 6. Filter by max(min(abs)) within each group
+    best_each = {k: filter_by_max_min_abs(v) for k, v in condensed.items()}
+    
+    # 7. Select global winners
+    winners = select_global_max_min_abs(list(best_each.values()))
+    
+    # 8. Compute best ion/mode indices properly
+    augmented = []
+    for tweezed_ion, mapping, score in winners:
+        # Access the corresponding values from combos
+        combo_dict = {combo_indices: arr for _, combo_indices, arr in combos[tweezed_ion]}
+        full_lamb_dicke_vector = combo_dict.get(mapping, np.array(mapping))
+        
+        # worst ion index = position in vector with largest magnitude
+        worst_ion_index = int(np.argmax(np.abs(full_lamb_dicke_vector)))
+        worst_mode_index = mapping[worst_ion_index]
+
+        augmented.append(
+            (
+                (tweezed_ion, mapping, score, P_opt, full_lamb_dicke_vector),
+                (worst_ion_index, worst_mode_index)
+            )
+        )
+
+    return augmented
+
+def run_optimal_mode_selection_tweezed_power_sweep(
+    omega_tweezer,
+    linewidths,
+    omega_res,
+    m,
+    mode_calc_r,
+    N,
+    f_rf_r,
+    f_rf_a,
+    P_list,
+    w0,
+    max_tweezed=1
+):
+    """
+    Sweep over a list of powers and run optimal mode selection
+    for tweezed configurations only using run_optimal_mode_selection_tweezed_only.
+
+    Returns:
+        power_results: list of tuples [(P_opt, winners), ...]
+    """
+    power_results = []
+
+    for P_opt in P_list:
+        winners = run_optimal_mode_selection_tweezed_only(
+            omega_tweezer,
+            linewidths,
+            omega_res,
+            m,
+            mode_calc_r,
+            N,
+            f_rf_r,
+            f_rf_a,
+            P_opt,
+            w0,
+            max_tweezed=max_tweezed
+        )
+        power_results.append((P_opt, winners))
+
+    return power_results
+
 def combine_lists_same_index_df(*lists):
     """
     N-dimensional version where all lists must pick
