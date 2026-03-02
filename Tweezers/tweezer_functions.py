@@ -723,7 +723,7 @@ def tweezer_combos_full_radial(
     for N in N_list:
         # Generate all possible tweezer combinations, but only over the first N/2 ions
         # Tweezing ions in the second half of the chain should be symmetric to the first half
-        half_range = N // 2
+        half_range = N // 2+1
         # MAke sure max_tweezed does not exceed available positions in the N/2 range
         max_tweezed_local = min(max_tweezed, half_range)
         all_combos = []
@@ -990,6 +990,15 @@ def run_optimal_mode_selection_tweezed_only(
         mode_calc_r, N, f_rf_r, f_rf_a, P_opt, w0,
         max_tweezed=max_tweezed
     )
+    
+    result = build_mode_series_and_combinations(df)
+    mode_lists_dict = result["mode_lists"]
+    
+  # Filter out P=0 rows (no actual tweezing)
+    df = df[df['P_per_tweezer (W)'] > 1e-12]
+    
+    if df.empty:
+        return []
     
     result = build_mode_series_and_combinations(df)
     mode_lists_dict = result["mode_lists"]
@@ -1344,7 +1353,7 @@ def midcircuit_modes_untweezed(omega_tweezer,
                      P,
                      w0
                      ):
-  """
+    """
     Inputs:
     omega_tweezer = optical tweezer beam angular frequency [2*Pi x Hz]
     linewidths = linewidth of the given resonant transition taken from NIST database in angular frequency units 
