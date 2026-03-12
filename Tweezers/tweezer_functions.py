@@ -1,4 +1,5 @@
 import math
+from unittest import result
 
 from scipy import constants
 import numpy as np
@@ -1299,7 +1300,9 @@ def midcircuit_modes(omega_tweezer,
     # build the mode lists
     result = build_mode_series_and_combinations(results)
     mode_list_test = []
-    for i in range(len(result) + 1):
+    # Get all mode indices (0 to N-1) and append them in order
+    mode_indices = sorted(result["mode_lists"].keys())
+    for i in mode_indices:
         mode_list_test.append(result["mode_lists"][i])
 
     # make a data frame for the all modes from one ion across every ion for every tweezer configuration
@@ -1391,7 +1394,8 @@ def midcircuit_modes_untweezed(omega_tweezer,
     result = build_mode_series_and_combinations(results)
 
     mode_list_test = []
-    for i in range(len(result) + 1):
+    mode_indices = sorted(result["mode_lists"].keys())
+    for i in mode_indices:
         mode_list_test.append(result["mode_lists"][i])
 
     # use untweezed combiner that does not expect a 'Tweezed Ion' column
