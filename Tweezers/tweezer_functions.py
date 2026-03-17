@@ -675,7 +675,7 @@ def tweezer_combos_full_radial(
     mode_calc_r,
     N_list,
     f_rf_r,
-    f_rf_a,
+    ueq_dict,
     P_opt,
     w0,
     max_tweezed=1,
@@ -737,7 +737,7 @@ def tweezer_combos_full_radial(
         # Setting up the rf-harmonic trap parameters for later
         w_rf_r = f_rf_r * 2 * pi
         w_rf_r_list = np.full(N, w_rf_r)
-        ueq = ion_spacing(N, 2*pi*f_rf_a)[0]
+        ueq = ueq_dict[N]
 
         # Looping over optical tweezer powers, P_opt
         for P_total in P_opt:
@@ -960,7 +960,7 @@ def run_optimal_mode_selection_tweezed_only(
     mode_calc_r,
     N,
     f_rf_r,
-    f_rf_a,
+    ueq_dict,
     P_opt,
     w0,
     max_tweezed=1
@@ -988,7 +988,7 @@ def run_optimal_mode_selection_tweezed_only(
     # 1. Build Lamb-Dicke parameter lists for all configurations
     df = tweezer_combos_full_radial(
         omega_tweezer, linewidths, omega_res, m,
-        mode_calc_r, N, f_rf_r, f_rf_a, P_opt, w0,
+        mode_calc_r, N, f_rf_r, ueq_dict, P_opt, w0,
         max_tweezed=max_tweezed
     )
     
@@ -1055,7 +1055,7 @@ def run_optimal_mode_selection_untweezed_only(
     mode_calc_r,
     N,
     f_rf_r,
-    f_rf_a,
+    ueq_dict,
     P_opt,
     w0
 ):
@@ -1082,7 +1082,7 @@ def run_optimal_mode_selection_untweezed_only(
     # 1. Build Lamb-Dicke parameter lists for the untweezed configuration
     df = tweezer_combos_full_radial(
         omega_tweezer, linewidths, omega_res, m,
-        mode_calc_r, N, f_rf_r, f_rf_a, P_opt, w0,
+        mode_calc_r, N, f_rf_r, ueq_dict, P_opt, w0,
         max_tweezed=0
     )
     
@@ -1150,7 +1150,7 @@ def run_optimal_mode_selection_tweezed_power_sweep(
     mode_calc_r,
     N,
     f_rf_r,
-    f_rf_a,
+    ueq_dict,
     P_list,
     w0,
     max_tweezed=1
@@ -1186,7 +1186,7 @@ def run_optimal_mode_selection_tweezed_power_sweep(
             mode_calc_r,
             N,
             f_rf_r,
-            f_rf_a,
+            ueq_dict,
             P_opt,
             w0,
             max_tweezed=max_tweezed
@@ -1257,7 +1257,7 @@ def midcircuit_modes(omega_tweezer,
                      mode_calc_r,
                      N,
                      f_rf_r,
-                     f_rf_a,
+                     ueq_dict,
                      P,
                      w0
                      ):
@@ -1271,7 +1271,7 @@ def midcircuit_modes(omega_tweezer,
     mode_calc_r = function from above to calculate radial modes
     N_list = list of number of ions to loop over (can also be a single integer)
     f_rf_r = radial rf trapping frequency [Hz]
-    f_rf_a = axial rf trapping frequency [Hz]
+    ueq_dict = dictionary of equilibrium positions for each ion
     P_opt = list of total optical power of tweezer laser beam to loop over (can also be a single number) [W]
     w0 = beamwaist of the tweezer laser beam [m] 
     
@@ -1292,7 +1292,7 @@ def midcircuit_modes(omega_tweezer,
         mode_calc_r,
         N,
         f_rf_r,
-        f_rf_a,
+        ueq_dict,
         P,
         w0,
         max_tweezed=1,
@@ -1352,7 +1352,7 @@ def midcircuit_modes_untweezed(omega_tweezer,
                      mode_calc_r,
                      N,
                      f_rf_r,
-                     f_rf_a,
+                     ueq_dict,
                      P,
                      w0
                      ):
@@ -1366,7 +1366,7 @@ def midcircuit_modes_untweezed(omega_tweezer,
     mode_calc_r = function from above to calculate radial modes
     N_list = list of number of ions to loop over (can also be a single integer)
     f_rf_r = radial rf trapping frequency [Hz]
-    f_rf_a = axial rf trapping frequency [Hz]
+    ueq_dict = dictionary of equilibrium positions for each ion
     P_opt = list of total optical power of tweezer laser beam to loop over (can also be a single number) [W]
     w0 = beamwaist of the tweezer laser beam [m] 
     
@@ -1386,7 +1386,7 @@ def midcircuit_modes_untweezed(omega_tweezer,
         mode_calc_r,
         N,
         f_rf_r,
-        f_rf_a,
+        ueq_dict,
         P,
         w0,
         max_tweezed=0,
@@ -1439,66 +1439,3 @@ def midcircuit_modes_untweezed(omega_tweezer,
     keep_mask = np.isclose(middle["sum_inverse_middle"].abs(), global_min, rtol=1e-8, atol=1e-12)
     final = middle.loc[keep_mask].reset_index(drop=True)
     return final
-
-def collect_midcircuit_combined_df(
-    Ns,
-    omega_t,
-    linewidths_,
-    omega_res_,
-    m_,
-    mode_calc,
-    f_rf_r_,
-    f_rf_a_,
-    P_,
-    w0_,
-    return_many_N=False,
-):
-    """
-    Run midcircuit_modes for each N in Ns and return a combined DataFrame.
-    Does NOT print or display per-N results. Keeps all rows (no per-N dedupe).
-    If return_many_N is True, also return the list of (N, per-N DataFrame).
-    """
-    dfs = []
-    many_N = []
-
-    for N in Ns:
-        test_loop = midcircuit_modes(
-            omega_t,
-            linewidths_,
-            omega_res_,
-            m_,
-            mode_calc,
-            N,
-            f_rf_r_,
-            f_rf_a_,
-            P_,
-            w0_,
-        )
-        many_N.append((N, test_loop))
-
-        if isinstance(test_loop, pd.DataFrame) and not test_loop.empty:
-            df = test_loop.copy().reset_index(drop=True)
-            df["N"] = int(N)
-            try:
-                df["Tweezed Ion"] = df["Tweezed Ion"].astype(int)
-            except Exception:
-                pass
-            dfs.append(df)
-
-    if dfs:
-        combined_df = pd.concat(dfs, ignore_index=True, sort=False)
-        cols = [
-            "N",
-            "Tweezed Ion",
-            "Coolant Ion",
-            "Mode couplings",
-            "inverse_mode_couplings",
-            "sum_inverse_middle",
-        ]
-        combined_df = combined_df[[c for c in cols if c in combined_df.columns]]
-    else:
-        combined_df = pd.DataFrame()
-
-    if return_many_N:
-        return combined_df, many_N
-    return combined_df
