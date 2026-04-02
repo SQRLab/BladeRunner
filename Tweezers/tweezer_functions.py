@@ -799,6 +799,146 @@ def tweezer_combos_full_radial(
 
     return pd.DataFrame(rows)
 
+
+def tweezer_combos_full_radial_middle_only(
+    omega_tweezer,
+    linewidths,
+    omega_res,
+    m,
+    mode_calc_r,
+    N_list,
+    f_rf_r,
+    ueq_dict,
+    P_opt,
+    w0,
+    max_tweezed=2,
+    qubit_lambda = 729e-9
+):
+    """
+    Inputs:
+    omega_tweezer = optical tweezer beam angular frequency [2*Pi x Hz]
+    linewidths = linewidth of the given resonant transition taken from NIST database in angular frequency units 
+        (ex, S1/2 to P1/2 and S1/2 to P3/2 for 40Ca+) 
+    omega_res = angular frequency of resonant transition, also based off NIST data [2*Pi x Hz]
+    m = mass of ion [kg]
+    mode_calc_r = function from above to calculate radial modes
+    N_list = list of number of ions to loop over (can also be a single integer)
+    f_rf_r = radial rf trapping frequency [Hz]
+    f_rf_a = axial rf trapping frequency [Hz]
+    P_opt = list of total optical power of tweezer laser beam to loop over (can also be a single number) [W]
+    w0 = beamwaist of the tweezer laser beam [m] 
+    qubit_lambda = wavelength of qubit transition [m] (729e-9 for 40Ca+)
+
+    Outputs:
+    DataFrame with columns:
+    - N: number of ions
+    - Tweezed ions: tuple of which ions are tweezed
+    - P_per_tweezer (W): power per tweezer in this configuration
+    - Combined radial frequencies: array of combined radial frequencies for each ion in this configuration
+    - Mode{i}_freq: frequency of mode i in this configuration (NaN if mode i does not exist for this N)
+    - Mode{i}_eigvec: eigenvector of mode i in this configuration (NaN array if mode i does not exist for this N)
+    """
+
+    # Making sure N and P are lists because the rest of the code needs them to be lists
+    if np.isscalar(N_list):
+        N_list = [int(N_list)]
+    if np.isscalar(P_opt):
+        P_opt = [P_opt]
+
+    #defining pi as just pi because I use it a lot 
+    pi = np.pi
+    rows = []
+    # compute k from provided qubit wavelength 
+    k = 2.0 * pi / qubit_lambda
+    eigvec_scale = k * np.sqrt(hbar / (2.0 * m))
+
+    # Looping over number of ions, N
+    for N in N_list:
+        if N % 2 == 1:
+            # odd N -> middle ion (0-based index)
+            middle = N // 2
+            if max_tweezed < 1:
+                all_combos = [tuple()]
+            else:
+                all_combos = [(middle,)]
+        else:
+            # even N -> central pair only (0-based indexing)
+            # N/2 and N/2+1 in 1-based are N//2 - 1 and N//2 in 0-based
+            left = N // 2 - 1
+            right = N // 2
+
+            if max_tweezed < 1:
+                all_combos = [tuple()]
+            else:
+                # For even N, only use the central pair
+                all_combos = [tuple(sorted((left, right)))]
+
+        # Setting up the rf-harmonic trap parameters for later
+        w_rf_r = f_rf_r * 2 * pi
+        w_rf_r_list = np.full(N, w_rf_r)
+        ueq = ueq_dict[N]
+
+        # Looping over optical tweezer powers, P_opt
+        for P_total in P_opt:
+            #looping over where the tweezer placement is, determined above in all_combos
+            for tweezed_positions in all_combos:
+                # If max_tweezed =/= 1, this divides total power equally amongst every tweezer
+                n_tweezed = len(tweezed_positions)
+                P_per = P_total / n_tweezed if n_tweezed > 0 else 0.0
+
+                # Compute tweezer potential and tweezer trap frequency for this configuration
+                pot = potential(omega_tweezer, linewidths, omega_res, P_per, w0)
+                w_tw_r = omega_tweezer_r(pot, w0, m)
+
+                # Combine tweezed and untweezed radial frequencies
+                # Here we are combining the tweezer radial frequency with the rf radial frequency
+                combo = np.array([
+                    np.sqrt(w_tw_r**2 + w_rf_r_list[i]**2) if i in tweezed_positions else w_rf_r_list[i]
+                    for i in range(N)
+                ])
+
+                # Finding radial modes from the combined frequencies, and the e-vecs and e-values
+                modes = mode_calc_r(m, combo, ueq, N)
+                freqs = np.array([f for f, v in modes], dtype=float) if len(modes) else np.array([], dtype=float)
+                if len(modes):
+                    eigvecs = np.vstack([np.ravel(v) for f, v in modes])  # shape (n_modes, N)
+                else:
+                    eigvecs = np.empty((0, N))
+
+                # Build the dataframe for the output of this configuration
+                row = {
+                    "N": N,
+                    "Tweezed ions": tweezed_positions,
+                    "P_per_tweezer (W)": P_per,
+                    "Combined radial frequencies": combo,
+                }
+
+                # Making sure the overall dataframe has the same number of columns for each N
+                # Fill Mode{i}_freq and Mode{i}_eigvec for i in [0, N-1]
+                for mode_index in range(N):
+                    # creating columns for all possible modes, if that N doesn't have those modes
+                    # then fill it in with NaN
+                    if mode_index < len(freqs):
+                        freq_val = float(freqs[mode_index])
+                        row[f"Mode{mode_index}_freq"] = float(freqs[mode_index])
+                    else:
+                        row[f"Mode{mode_index}_freq"] = np.nan
+
+                    # eigenvector (length N) or NaN array
+                    if mode_index < eigvecs.shape[0]:
+                        omega_mode = 2.0 * pi * freq_val
+                        scale = eigvec_scale * np.sqrt(1.0 / omega_mode)
+                        row[f"Mode{mode_index}_eigvec"] = (scale * np.ravel(eigvecs[mode_index])).astype(float)
+                    else:
+                        # use full-length nan array to keep shape consistent
+                        row[f"Mode{mode_index}_eigvec"] = np.full(N, np.nan, dtype=float)
+
+                # --- Store completed row ---
+                rows.append(row)
+
+    return pd.DataFrame(rows)
+
+
 def build_mode_series_and_combinations(df):
     """
     Inputs:
