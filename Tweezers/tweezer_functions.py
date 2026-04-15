@@ -209,9 +209,9 @@ def pot_derivative_with_tweeze(x, omega_rf_axial, omega_tw_radial, tweezed_ion, 
     displacement: distance between the tweezer beam center and position of the tweezed ion MAKE ME A LIST
     """
     N = len(x)
-    A = 1/2 * m * omega_rf_axial**2
+    A = 1 * m * omega_rf_axial**2 #changed from 1/2 to 1
     B = (e**2) /(4 * pi * eps0)
-    C = 1/2 * m * omega_tw_radial**2
+    C = 1 * m * omega_tw_radial**2 #changed from 1/2 to 1
     
     return [A*(x[m]) 
             - sum([B / (abs(x[m] - x[n])**2) for n in range(m) if x[m] != x[n]])  # Avoid division by zero
@@ -233,9 +233,9 @@ def pot_derivative_with_2tweeze(x, omega_rf_axial, omega_tw_radial, tweezed_ion1
     displacement: distance between the tweezer beam center and position of the tweezed ion
     """
     N = len(x)
-    A = 1/2 * m * omega_rf_axial**2
+    A = 1 * m * omega_rf_axial**2
     B = (e**2) /(4 * pi * eps0)
-    C = 1/2 * m * omega_tw_radial**2
+    C = 1 * m * omega_tw_radial**2
     
     return [A*(x[m]) 
             - sum([B / (abs(x[m] - x[n])**2) for n in range(m) if x[m] != x[n]])  # Avoid division by zero
