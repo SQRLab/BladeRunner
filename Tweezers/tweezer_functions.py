@@ -217,7 +217,7 @@ def pot_derivative_with_tweeze(x, omega_rf_axial, omega_tw_radial, tweezed_ion, 
             - sum([B / (abs(x[m] - x[n])**2) for n in range(m) if x[m] != x[n]])  # Avoid division by zero
             + sum([B / (abs(x[m] - x[n])**2) for n in range(m+1, N) if x[m] != x[n]])  # Avoid division by zero
             #MAKE ME A LOOP SO THE LIST MAKES SENSE
-            + C*(x[tweezed_ion] - displacement) if m == tweezed_ion else 0  # Only apply tweezer potential to the tweezed ion
+            + (C*(x[tweezed_ion] - displacement) if m == tweezed_ion else 0)  # ACTUALLY Only apply tweezer potential to the tweezed ion
             for m in range(N)]
 
 def pot_derivative_with_2tweeze(x, omega_rf_axial, omega_tw_radial, tweezed_ion1,tweezed_ion2, displacement1,displacement2):
