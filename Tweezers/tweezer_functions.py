@@ -9,6 +9,8 @@ import itertools
 from itertools import product
 import pandas as pd
 import re
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 
 #Constants in SI units
 eps0 = constants.epsilon_0
@@ -928,7 +930,7 @@ def tweezer_combos_full_radial_middle_only(
                     if mode_index < eigvecs.shape[0]:
                         omega_mode = 2.0 * pi * freq_val
                         scale = eigvec_scale * np.sqrt(1.0 / omega_mode)
-                        row[f"Mode{mode_index}_eigvec"] = (scale * np.ravel(eigvecs[mode_index])).astype(float)
+                        row[f"Mode{mode_index}_eigvec"] = (np.ravel(eigvecs[mode_index])).astype(float)
                     else:
                         # use full-length nan array to keep shape consistent
                         row[f"Mode{mode_index}_eigvec"] = np.full(N, np.nan, dtype=float)
@@ -1579,3 +1581,102 @@ def midcircuit_modes_untweezed(omega_tweezer,
     keep_mask = np.isclose(middle["sum_inverse_middle"].abs(), global_min, rtol=1e-8, atol=1e-12)
     final = middle.loc[keep_mask].reset_index(drop=True)
     return final
+
+def plot_mode_table_from_results(results_df, row_idx=0, title_suffix=""):
+    result = results_df.iloc[row_idx]
+    N = int(result["N"])
+
+    fig, ax = plt.subplots(figsize=(32, 30))
+    ax.set_position([0.01, 0.04, 0.83, 0.88])
+    ax.axis("off")
+
+    radial_modes = []
+    etas_radial = []
+
+    for mode_idx in range(N):
+        freq_col = f"Mode{mode_idx}_freq"
+        eigvec_col = f"Mode{mode_idx}_eigvec"
+
+        if freq_col not in results_df.columns or eigvec_col not in results_df.columns:
+            continue
+
+        freq = result[freq_col]
+        eigvec_data = result[eigvec_col]
+
+        if pd.isna(freq):
+            continue
+
+        eigvec = np.asarray(eigvec_data, dtype=float).ravel()
+        radial_modes.append(freq)
+        etas_radial.append(eigvec)
+
+    if not radial_modes:
+        print("No modes found.")
+        return
+
+    table_data = []
+    for i, freq in enumerate(radial_modes):
+        formatted_values = [f"{eta:.3f}" for eta in etas_radial[i]]
+        omega_label = f"$f_{{{i}}}$ = {freq/1e6:.2f} MHz"
+        table_data.append([omega_label] + formatted_values)
+
+    num_ions = len(etas_radial[0])
+    column_labels = ["Eigenfrequency"] + [f"Ion {i}" for i in range(num_ions)]
+
+    all_values = np.asarray([v for row in etas_radial for v in row], dtype=float)
+    all_values = all_values[np.isfinite(all_values)]
+
+    if all_values.size == 0:
+        vmax = 0.02
+    else:
+        vmax = np.nanpercentile(np.abs(all_values), 75)
+        vmax = max(vmax, 0.02)
+
+    cmap = plt.get_cmap("seismic")
+    norm = mcolors.TwoSlopeNorm(vmin=-vmax, vcenter=0.0, vmax=vmax)
+
+    table = ax.table(
+        cellText=table_data,
+        colLabels=column_labels,
+        loc="center",
+        cellLoc="center",
+        bbox=[0.0, 0.0, 1.0, 0.96],
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(9)
+    table.scale(1.35, 2.8)
+
+    # Apply colors to cells
+    for i, row in enumerate(table_data, start=1):
+        for j in range(1, len(row)):
+            value = float(row[j])
+            color = cmap(norm(value))
+            table[i, j].set_facecolor(color)
+            table[i, j].set_text_props(color="black")
+
+    # Header styling
+    tweezed_ions = set(result.get("Tweezed ions", ()))
+    for j in range(1, len(column_labels)):
+        ion_idx = j - 1
+        if ion_idx in tweezed_ions:
+            table[0, j].set_facecolor("#2ECC71")
+        else:
+            table[0, j].set_facecolor("#FF42A1")
+
+    table[0, 0].set_facecolor("white")
+
+    # Add colorbar
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    cax = fig.add_axes([0.88, 0.18, 0.015, 0.64])
+    cbar = fig.colorbar(sm, cax=cax)
+    cbar.set_label("Eigenvector Component", fontsize=12)
+
+    fig.suptitle(
+        f"Radial Mode Frequencies and Eigenvectors (N={N}) {title_suffix}",
+        fontsize=18,
+        fontweight="bold",
+        y=0.985,
+    )
+
+    plt.show()
