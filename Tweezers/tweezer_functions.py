@@ -836,6 +836,7 @@ def tweezer_combos_full_radial_middle_only(
     - N: number of ions
     - Tweezed ions: tuple of which ions are tweezed
     - P_per_tweezer (W): power per tweezer in this configuration
+    - Tweezer_freq_radial (Hz): radial tweezer trap frequency for this configuration
     - Combined radial frequencies: array of combined radial frequencies for each ion in this configuration
     - Mode{i}_freq: frequency of mode i in this configuration (NaN if mode i does not exist for this N)
     - Mode{i}_eigvec: eigenvector of mode i in this configuration (NaN array if mode i does not exist for this N)
@@ -912,6 +913,7 @@ def tweezer_combos_full_radial_middle_only(
                     "N": N,
                     "Tweezed ions": tweezed_positions,
                     "P_per_tweezer (W)": P_per,
+                    "Tweezer_freq_radial (Hz)": w_tw_r,
                     "Combined radial frequencies": combo,
                 }
 
@@ -1582,7 +1584,15 @@ def midcircuit_modes_untweezed(omega_tweezer,
     final = middle.loc[keep_mask].reset_index(drop=True)
     return final
 
-def plot_mode_table_from_results(results_df, row_idx=0, title_suffix=""):
+def _contrast_color(rgba):
+    r, g, b = rgba[:3]
+    def linearize(c):
+        return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+    L = 0.2126 * linearize(r) + 0.7152 * linearize(g) + 0.0722 * linearize(b)
+    return "black" if L > 0.179 else "white"
+
+
+def plot_mode_table_from_results(results_df, row_idx=0, title_suffix="", fontsize=9, font_color="auto"):
     result = results_df.iloc[row_idx]
     N = int(result["N"])
 
@@ -1617,7 +1627,7 @@ def plot_mode_table_from_results(results_df, row_idx=0, title_suffix=""):
     table_data = []
     for i, freq in enumerate(radial_modes):
         formatted_values = [f"{eta:.3f}" for eta in etas_radial[i]]
-        omega_label = f"$f_{{{i}}}$ = {freq/1e6:.2f} MHz"
+        omega_label = f"$f_{{{i}}}$ = {freq/1e6:.4f} MHz"
         table_data.append([omega_label] + formatted_values)
 
     num_ions = len(etas_radial[0])
@@ -1643,7 +1653,7 @@ def plot_mode_table_from_results(results_df, row_idx=0, title_suffix=""):
         bbox=[0.0, 0.0, 1.0, 0.96],
     )
     table.auto_set_font_size(False)
-    table.set_fontsize(9)
+    table.set_fontsize(fontsize)
     table.scale(1.35, 2.8)
 
     # Apply colors to cells
@@ -1652,16 +1662,17 @@ def plot_mode_table_from_results(results_df, row_idx=0, title_suffix=""):
             value = float(row[j])
             color = cmap(norm(value))
             table[i, j].set_facecolor(color)
-            table[i, j].set_text_props(color="black")
+            fc = _contrast_color(color) if font_color == "auto" else font_color
+            table[i, j].set_text_props(color=fc)
 
     # Header styling
     tweezed_ions = set(result.get("Tweezed ions", ()))
     for j in range(1, len(column_labels)):
         ion_idx = j - 1
-        if ion_idx in tweezed_ions:
-            table[0, j].set_facecolor("#2ECC71")
-        else:
-            table[0, j].set_facecolor("#FF42A1")
+        bg = "#2ECC71" if ion_idx in tweezed_ions else "#FF42A1"
+        table[0, j].set_facecolor(bg)
+        if font_color == "auto":
+            table[0, j].set_text_props(color=_contrast_color(mcolors.to_rgba(bg)))
 
     table[0, 0].set_facecolor("white")
 
@@ -1670,11 +1681,12 @@ def plot_mode_table_from_results(results_df, row_idx=0, title_suffix=""):
     sm.set_array([])
     cax = fig.add_axes([0.88, 0.18, 0.015, 0.64])
     cbar = fig.colorbar(sm, cax=cax)
-    cbar.set_label("Eigenvector Component", fontsize=12)
+    cbar.set_label("Eigenvector Component", fontsize=fontsize)
+    cbar.ax.tick_params(labelsize=fontsize)
 
     fig.suptitle(
         f"Radial Mode Frequencies and Eigenvectors (N={N}) {title_suffix}",
-        fontsize=18,
+        fontsize=fontsize + 10,
         fontweight="bold",
         y=0.985,
     )
