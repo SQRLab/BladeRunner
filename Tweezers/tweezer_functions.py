@@ -1592,13 +1592,22 @@ def _contrast_color(rgba):
     return "black" if L > 0.179 else "white"
 
 
-def plot_mode_table_from_results(results_df, row_idx=0, title_suffix="", fontsize=9, font_color="auto"):
+def plot_mode_table_from_results(
+    results_df,
+    row_idx=0,
+    title_suffix="",
+    fontsize=15,
+    font_color="auto",
+    bold=False,
+    cell_scale=(1.35, 2.8),
+    col_labels=None,
+    row_label_fmt=None,
+    row_label_colors=None,
+    value_decimals=3,
+    fig_size_px=(1330, 790),
+):
     result = results_df.iloc[row_idx]
     N = int(result["N"])
-
-    fig, ax = plt.subplots(figsize=(32, 30))
-    ax.set_position([0.01, 0.04, 0.83, 0.88])
-    ax.axis("off")
 
     radial_modes = []
     etas_radial = []
@@ -1626,12 +1635,28 @@ def plot_mode_table_from_results(results_df, row_idx=0, title_suffix="", fontsiz
 
     table_data = []
     for i, freq in enumerate(radial_modes):
-        formatted_values = [f"{eta:.3f}" for eta in etas_radial[i]]
-        omega_label = f"$f_{{{i}}}$ = {freq/1e6:.4f} MHz"
+        formatted_values = [
+            f"{abs(eta):.{value_decimals}f}" if round(eta, value_decimals) == 0 else f"{eta:.{value_decimals}f}"
+            for eta in etas_radial[i]
+        ]
+        if row_label_fmt is not None:
+            omega_label = row_label_fmt.format(i=i, freq_mhz=freq / 1e6)
+        else:
+            omega_label = f"$f_{{{i}}}$ = {freq/1e6:.4f} MHz"
         table_data.append([omega_label] + formatted_values)
 
     num_ions = len(etas_radial[0])
-    column_labels = ["Eigenfrequency"] + [f"Ion {i}" for i in range(num_ions)]
+    if col_labels is not None:
+        column_labels = col_labels
+    else:
+        column_labels = ["Eigenfrequency"] + [f"Ion {i}" for i in range(num_ions)]
+
+    num_cols = num_ions + 1
+    num_table_rows = len(table_data) + 1
+    px = 1 / plt.rcParams["figure.dpi"]
+    fig, ax = plt.subplots(figsize=(fig_size_px[0] * px, fig_size_px[1] * px))
+    ax.set_position([0.01, 0.04, 0.83, 0.88])
+    ax.axis("off")
 
     all_values = np.asarray([v for row in etas_radial for v in row], dtype=float)
     all_values = all_values[np.isfinite(all_values)]
@@ -1654,7 +1679,9 @@ def plot_mode_table_from_results(results_df, row_idx=0, title_suffix="", fontsiz
     )
     table.auto_set_font_size(False)
     table.set_fontsize(fontsize)
-    table.scale(1.35, 2.8)
+    table.scale(*cell_scale)
+
+    fw = "bold" if bold else "normal"
 
     # Apply colors to cells
     for i, row in enumerate(table_data, start=1):
@@ -1663,32 +1690,35 @@ def plot_mode_table_from_results(results_df, row_idx=0, title_suffix="", fontsiz
             color = cmap(norm(value))
             table[i, j].set_facecolor(color)
             fc = _contrast_color(color) if font_color == "auto" else font_color
-            table[i, j].set_text_props(color=fc)
+            table[i, j].set_text_props(color=fc, fontweight=fw)
+        if row_label_colors is not None and (i - 1) < len(row_label_colors):
+            bg = row_label_colors[i - 1]
+            table[i, 0].set_facecolor(bg)
+            fc = _contrast_color(mcolors.to_rgba(bg)) if font_color == "auto" else font_color
+            table[i, 0].set_text_props(color=fc, fontweight=fw)
+        else:
+            table[i, 0].set_text_props(fontweight=fw)
 
     # Header styling
     tweezed_ions = set(result.get("Tweezed ions", ()))
     for j in range(1, len(column_labels)):
         ion_idx = j - 1
-        bg = "#2ECC71" if ion_idx in tweezed_ions else "#FF42A1"
+        bg = "#61D836" if ion_idx in tweezed_ions else "white"
         table[0, j].set_facecolor(bg)
-        if font_color == "auto":
-            table[0, j].set_text_props(color=_contrast_color(mcolors.to_rgba(bg)))
+        fc = _contrast_color(mcolors.to_rgba(bg)) if font_color == "auto" else font_color
+        table[0, j].set_text_props(color=fc, fontweight=fw)
 
     table[0, 0].set_facecolor("white")
+    table[0, 0].set_text_props(fontweight=fw)
 
     # Add colorbar
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
     sm.set_array([])
     cax = fig.add_axes([0.88, 0.18, 0.015, 0.64])
     cbar = fig.colorbar(sm, cax=cax)
-    cbar.set_label("Eigenvector Component", fontsize=fontsize)
-    cbar.ax.tick_params(labelsize=fontsize)
-
-    fig.suptitle(
-        f"Radial Mode Frequencies and Eigenvectors (N={N}) {title_suffix}",
-        fontsize=fontsize + 10,
-        fontweight="bold",
-        y=0.985,
-    )
+    cbar.set_label("Mode Coupling Value", fontsize=fontsize,style = "normal", weight = "bold")
+    cbar.ax.tick_params(labelsize=fontsize + 4, width=2, length=6)
+    for label in cbar.ax.get_yticklabels():
+        label.set_fontweight("bold")
 
     plt.show()
