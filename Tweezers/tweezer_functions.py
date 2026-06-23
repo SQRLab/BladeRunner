@@ -6,7 +6,7 @@ import numpy as np
 from IonChainTools import calcPositions,lengthScale
 from scipy.optimize import fsolve
 import itertools
-from itertools import product
+from itertools import product, permutations
 import pandas as pd
 import re
 import matplotlib.pyplot as plt
@@ -1071,6 +1071,36 @@ def combine_lists(*lists):
 
     return groups
 
+def combine_lists_test(*lists):
+    """
+    Same as combine_lists but uses itertools.permutations instead of
+    product + uniqueness filter, skipping the K^N candidates that get thrown away.
+    """
+    N = len(lists)
+    K = len(lists[0][0][1])
+
+    keys = [idx for idx, _ in lists[0]]
+
+    idx_maps = []
+    for lst in lists:
+        idx_maps.append({idx: arr for idx, arr in lst})
+    groups = {key: [] for key in keys}
+
+    for key in keys:
+        chosen = [idx_maps[m][key] for m in range(N)]
+
+        for elem_choices in permutations(range(K), N):
+            values = np.array([
+                chosen[m][elem_choices[m]]
+                for m in range(N)
+            ])
+            groups[key].append(
+                (key, elem_choices, values)
+            )
+
+    return groups
+
+
 def select_global_max_min_abs(groups, tol=1e-12):
     """
     Given a list of lists where each inner list contains tuples
@@ -1191,6 +1221,70 @@ def run_optimal_mode_selection_tweezed_only(
 
     return augmented
 
+def run_optimal_mode_selection_tweezed_only_test(
+    omega_tweezer,
+    linewidths,
+    omega_res,
+    m,
+    mode_calc_r,
+    N,
+    f_rf_r,
+    ueq_dict,
+    P_opt,
+    w0,
+    max_tweezed=1
+):
+    """Same as run_optimal_mode_selection_tweezed_only but uses combine_lists_test (permutations)."""
+
+    df = tweezer_combos_full_radial(
+        omega_tweezer, linewidths, omega_res, m,
+        mode_calc_r, N, f_rf_r, ueq_dict, P_opt, w0,
+        max_tweezed=max_tweezed
+    )
+
+    result = build_mode_series_and_combinations(df)
+    mode_lists_dict = result["mode_lists"]
+
+    df = df[df['P_per_tweezer (W)'] > 1e-12]
+
+    if df.empty:
+        return []
+
+    result = build_mode_series_and_combinations(df)
+    mode_lists_dict = result["mode_lists"]
+
+    cleaned = {
+        k: v for k, v in mode_lists_dict.items()
+        if k is not None and not (isinstance(k, float) and math.isnan(k)) and k != ()
+    }
+    mode_lists_dict = cleaned
+
+    if not mode_lists_dict:
+        return []
+
+    mode_indices = sorted(
+        mode_lists_dict.keys(),
+        key=lambda x: (str(x) if isinstance(x, tuple) else x)
+    )
+    mode_lists_ordered = [mode_lists_dict[i] for i in mode_indices]
+
+    combos = combine_lists_test(*mode_lists_ordered)
+
+    condensed = {k: condense_by_min_abs(v) for k, v in combos.items()}
+    best_each = {k: filter_by_max_min_abs(v) for k, v in condensed.items()}
+    winners = select_global_max_min_abs(list(best_each.values()))
+
+    augmented = []
+    for tweezed_ion, mapping, score in winners:
+        combo_dict = {combo_indices: arr for _, combo_indices, arr in combos[tweezed_ion]}
+        full_lamb_dicke_vector = combo_dict.get(mapping, np.array(mapping))
+        augmented.append(
+            (tweezed_ion, mapping, score, P_opt, full_lamb_dicke_vector)
+        )
+
+    return augmented
+
+
 def run_optimal_mode_selection_untweezed_only(
     omega_tweezer,
     linewidths,
@@ -1285,6 +1379,65 @@ def run_optimal_mode_selection_untweezed_only(
         )
 
     return augmented
+
+def run_optimal_mode_selection_untweezed_only_test(
+    omega_tweezer,
+    linewidths,
+    omega_res,
+    m,
+    mode_calc_r,
+    N,
+    f_rf_r,
+    ueq_dict,
+    P_opt,
+    w0
+):
+    """Same as run_optimal_mode_selection_untweezed_only but uses combine_lists_test (permutations)."""
+
+    df = tweezer_combos_full_radial(
+        omega_tweezer, linewidths, omega_res, m,
+        mode_calc_r, N, f_rf_r, ueq_dict, P_opt, w0,
+        max_tweezed=0
+    )
+
+    result = build_mode_series_and_combinations(df)
+    mode_lists_dict = result["mode_lists"]
+
+    cleaned = {
+        k: v for k, v in mode_lists_dict.items()
+        if k is not None and not (isinstance(k, float) and math.isnan(k)) and k != ()
+    }
+    mode_lists_dict = cleaned
+
+    if not mode_lists_dict:
+        return []
+
+    mode_indices = sorted(
+        mode_lists_dict.keys(),
+        key=lambda x: (str(x) if isinstance(x, tuple) else x)
+    )
+
+    if not mode_indices:
+        return []
+
+    mode_lists_ordered = [mode_lists_dict[i] for i in mode_indices]
+
+    combos = combine_lists_test(*mode_lists_ordered)
+
+    condensed = {k: condense_by_min_abs(v) for k, v in combos.items()}
+    best_each = {k: filter_by_max_min_abs(v) for k, v in condensed.items()}
+    winners = select_global_max_min_abs(list(best_each.values()))
+
+    augmented = []
+    for tweezed_ion, mapping, score in winners:
+        combo_dict = {combo_indices: arr for _, combo_indices, arr in combos[tweezed_ion]}
+        full_lamb_dicke_vector = combo_dict.get(mapping, np.array(mapping))
+        augmented.append(
+            (tweezed_ion, mapping, score, P_opt, full_lamb_dicke_vector)
+        )
+
+    return augmented
+
 
 def run_optimal_mode_selection_tweezed_power_sweep(
     omega_tweezer,
@@ -1605,6 +1758,7 @@ def plot_mode_table_from_results(
     row_label_colors=None,
     value_decimals=3,
     fig_size_px=(1330, 790),
+    colormap="PuRd",
 ):
     result = results_df.iloc[row_idx]
     N = int(result["N"])
@@ -1636,7 +1790,7 @@ def plot_mode_table_from_results(
     table_data = []
     for i, freq in enumerate(radial_modes):
         formatted_values = [
-            f"{abs(eta):.{value_decimals}f}" if round(eta, value_decimals) == 0 else f"{eta:.{value_decimals}f}"
+            f"{abs(eta):.{value_decimals}f}"
             for eta in etas_radial[i]
         ]
         if row_label_fmt is not None:
@@ -1667,8 +1821,8 @@ def plot_mode_table_from_results(
         vmax = np.nanpercentile(np.abs(all_values), 75)
         vmax = max(vmax, 0.02)
 
-    cmap = plt.get_cmap("seismic")
-    norm = mcolors.TwoSlopeNorm(vmin=-vmax, vcenter=0.0, vmax=vmax)
+    cmap = plt.get_cmap(colormap)
+    norm = mcolors.Normalize(vmin=0.0, vmax=vmax)
 
     table = ax.table(
         cellText=table_data,
@@ -1686,7 +1840,7 @@ def plot_mode_table_from_results(
     # Apply colors to cells
     for i, row in enumerate(table_data, start=1):
         for j in range(1, len(row)):
-            value = float(row[j])
+            value = abs(float(row[j]))
             color = cmap(norm(value))
             table[i, j].set_facecolor(color)
             fc = _contrast_color(color) if font_color == "auto" else font_color
@@ -1716,7 +1870,159 @@ def plot_mode_table_from_results(
     sm.set_array([])
     cax = fig.add_axes([0.88, 0.18, 0.015, 0.64])
     cbar = fig.colorbar(sm, cax=cax)
-    cbar.set_label("Mode Coupling Value", fontsize=fontsize,style = "normal", weight = "bold")
+    cbar.set_label("|Mode Coupling Value|", fontsize=fontsize,style = "normal", weight = "bold")
+    cbar.ax.tick_params(labelsize=fontsize + 4, width=2, length=6)
+    for label in cbar.ax.get_yticklabels():
+        label.set_fontweight("bold")
+
+    plt.show()
+
+
+def plot_mode_table_from_results_test(
+    results_df,
+    row_idx=0,
+    title_suffix="",
+    fontsize=15,
+    font_color="auto",
+    bold=False,
+    cell_scale=(1.35, 2.8),
+    col_labels=None,
+    row_label_fmt=None,
+    row_label_colors=None,
+    value_decimals=3,
+    fig_size_px=(790, 790),
+    colormap="PuRd",
+    ion_col_width=None,
+):
+    """Same as plot_mode_table_from_results but ion-column cells show color only — no numbers."""
+    result = results_df.iloc[row_idx]
+    N = int(result["N"])
+
+    radial_modes = []
+    etas_radial = []
+
+    for mode_idx in range(N):
+        freq_col = f"Mode{mode_idx}_freq"
+        eigvec_col = f"Mode{mode_idx}_eigvec"
+
+        if freq_col not in results_df.columns or eigvec_col not in results_df.columns:
+            continue
+
+        freq = result[freq_col]
+        eigvec_data = result[eigvec_col]
+
+        if pd.isna(freq):
+            continue
+
+        eigvec = np.asarray(eigvec_data, dtype=float).ravel()
+        radial_modes.append(freq)
+        etas_radial.append(eigvec)
+
+    if not radial_modes:
+        print("No modes found.")
+        return
+
+    table_data = []
+    color_values = []  # absolute floats for color mapping, kept separate from display text
+    for i, freq in enumerate(radial_modes):
+        color_values.append([abs(v) for v in etas_radial[i]])
+        if row_label_fmt is not None:
+            omega_label = row_label_fmt.format(i=i, freq_mhz=freq / 1e6)
+        else:
+            omega_label = f"$f_{{{i}}}$ = {freq/1e6:.4f} MHz"
+        table_data.append([omega_label] + [""] * len(etas_radial[i]))
+
+    num_ions = len(etas_radial[0])
+    if col_labels is not None:
+        column_labels = col_labels
+    else:
+        column_labels = ["Eigenfrequency"] + [f"Ion {i}" for i in range(num_ions)]
+
+    num_cols = num_ions + 1
+    num_table_rows = len(table_data) + 1
+
+    # Compute column widths from content before building the table
+    fig_w_pts = (fig_size_px[0] / plt.rcParams["figure.dpi"]) * 72
+    ax_w_pts = fig_w_pts * 0.83
+
+    if ion_col_width is None:
+        max_ion_chars = max(len(lbl) for lbl in column_labels[1:])
+        ion_col_width = (max_ion_chars * fontsize * 0.6 + fontsize) / ax_w_pts
+
+    freq_labels = [row[0] for row in table_data]
+    max_freq_chars = max(len(lbl) for lbl in freq_labels)
+    freq_col_width = (max_freq_chars * fontsize * 0.6 + fontsize) / ax_w_pts
+
+    total_col_width = freq_col_width + num_ions * ion_col_width
+
+    px = 1 / plt.rcParams["figure.dpi"]
+    fig, ax = plt.subplots(figsize=(fig_size_px[0] * px, fig_size_px[1] * px))
+    ax.set_position([0.01, 0.04, 0.83, 0.88])
+    ax.axis("off")
+
+    all_values = np.asarray([v for row in etas_radial for v in row], dtype=float)
+    all_values = all_values[np.isfinite(all_values)]
+
+    if all_values.size == 0:
+        vmax = 0.02
+    else:
+        vmax = np.nanpercentile(np.abs(all_values), 75)
+        vmax = max(vmax, 0.02)
+
+    cmap = plt.get_cmap(colormap)
+    norm = mcolors.Normalize(vmin=0.0, vmax=vmax)
+
+    table = ax.table(
+        cellText=table_data,
+        colLabels=column_labels,
+        loc="upper left",
+        cellLoc="center",
+        bbox=[0.0, 0.0, total_col_width, 0.96],
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(fontsize)
+    table.scale(*cell_scale)
+
+    for r in range(num_table_rows):
+        table[r, 0].set_width(freq_col_width)
+        for c in range(1, num_cols):
+            table[r, c].set_width(ion_col_width)
+
+    fw = "bold" if bold else "normal"
+
+    # Apply colors to ion cells using absolute values; display text stays empty
+    for i, row in enumerate(table_data, start=1):
+        for j in range(1, len(row)):
+            value = color_values[i - 1][j - 1]
+            color = cmap(norm(value))
+            table[i, j].set_facecolor(color)
+            table[i, j].set_text_props(fontweight=fw)
+        if row_label_colors is not None and (i - 1) < len(row_label_colors):
+            bg = row_label_colors[i - 1]
+            table[i, 0].set_facecolor(bg)
+            fc = _contrast_color(mcolors.to_rgba(bg)) if font_color == "auto" else font_color
+            table[i, 0].set_text_props(color=fc, fontweight=fw)
+        else:
+            table[i, 0].set_text_props(fontweight=fw)
+
+    # Header styling
+    tweezed_ions = set(result.get("Tweezed ions", ()))
+    for j in range(1, len(column_labels)):
+        ion_idx = j - 1
+        bg = "#61D836" if ion_idx in tweezed_ions else "white"
+        table[0, j].set_facecolor(bg)
+        fc = _contrast_color(mcolors.to_rgba(bg)) if font_color == "auto" else font_color
+        table[0, j].set_text_props(color=fc, fontweight=fw)
+
+    table[0, 0].set_facecolor("white")
+    table[0, 0].set_text_props(fontweight=fw)
+
+    # Add colorbar
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    cax = fig.add_axes([0.88, 0.18, 0.015, 0.64])
+    cbar = fig.colorbar(sm, cax=cax)
+    cbar.set_label("|Mode Coupling Value|", fontsize=fontsize, style="normal", weight="bold")
     cbar.ax.tick_params(labelsize=fontsize + 4, width=2, length=6)
     for label in cbar.ax.get_yticklabels():
         label.set_fontweight("bold")
