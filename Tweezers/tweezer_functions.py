@@ -1951,7 +1951,7 @@ def plot_mode_table_from_results_test(
 
     freq_labels = [row[0] for row in table_data]
     max_freq_chars = max(len(lbl) for lbl in freq_labels)
-    freq_col_width = (max_freq_chars * fontsize * 0.6 + fontsize) / ax_w_pts
+    freq_col_width = (max_freq_chars * fontsize * 0.6 + 1.5 * fontsize) / ax_w_pts
 
     total_col_width = freq_col_width + num_ions * ion_col_width
 
@@ -1988,6 +1988,9 @@ def plot_mode_table_from_results_test(
         for c in range(1, num_cols):
             table[r, c].set_width(ion_col_width)
 
+    for cell in table.get_celld().values():
+        cell.set_linewidth(2)
+
     fw = "bold" if bold else "normal"
 
     # Apply colors to ion cells using absolute values; display text stays empty
@@ -2017,10 +2020,13 @@ def plot_mode_table_from_results_test(
     table[0, 0].set_facecolor("white")
     table[0, 0].set_text_props(fontweight=fw)
 
-    # Add colorbar
+    # Add colorbar — anchor it just past the right edge of the table
+    ax_left = 0.01   # matches ax.set_position x
+    ax_width = 0.83  # matches ax.set_position width
+    cbar_left = ax_left + ax_width * total_col_width + 0.01
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
     sm.set_array([])
-    cax = fig.add_axes([0.88, 0.18, 0.015, 0.64])
+    cax = fig.add_axes([cbar_left, 0.18, 0.015, 0.64])
     cbar = fig.colorbar(sm, cax=cax)
     cbar.set_label("|Mode Coupling Value|", fontsize=fontsize, style="normal", weight="bold")
     cbar.ax.tick_params(labelsize=fontsize + 4, width=2, length=6)
