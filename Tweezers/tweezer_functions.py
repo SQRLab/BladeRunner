@@ -449,7 +449,7 @@ def combined_frequencies(N,tweezed_ions,w_tweezer_r,w_tweezer_a,w_rf_r,w_rf_a):
     omeg_rf_a = w_rf_a * np.ones(N)
 
     omega_combined_rr = np.sqrt(omeg_rf_r**2 + omeg_tweezer_r**2)
-    omega_combined_ra = np.sqrt(omeg_rf_r**2 + omeg_tweezer_a)
+    omega_combined_ra = np.sqrt(omeg_rf_r**2 + omeg_tweezer_a**2)
     omega_combined_ar = np.sqrt(omeg_rf_a**2 + omeg_tweezer_r**2)
     
     return np.array([omega_combined_rr,omega_combined_ra,omega_combined_ar])
@@ -802,6 +802,114 @@ def tweezer_combos_full_radial(
     return pd.DataFrame(rows)
 
 
+def tweezer_combos_full_radial_unscaled(
+    omega_tweezer,
+    linewidths,
+    omega_res,
+    m,
+    mode_calc_r,
+    N_list,
+    f_rf_r,
+    ueq_dict,
+    P_opt,
+    w0,
+    max_tweezed=1,
+    qubit_lambda = 729e-9
+):
+    """
+    Same as tweezer_combos_full_radial, but Mode{i}_eigvec columns hold the
+    raw mode-vector (eigenvector) components, without the Lamb-Dicke/eta scale factor.
+    """
+
+
+    # Making sure N and P are lists because the rest of the code needs them to be lists
+    if np.isscalar(N_list):
+        N_list = [int(N_list)]
+    if np.isscalar(P_opt):
+        P_opt = [P_opt]
+
+    #defining pi as just pi because I use it a lot
+    pi = np.pi
+    rows = []
+
+    # Looping over number of ions, N
+    for N in N_list:
+        # Generate all possible tweezer combinations, but only over the first N/2 ions
+        # Tweezing ions in the second half of the chain should be symmetric to the first half
+        half_range = N // 2+1
+        # MAke sure max_tweezed does not exceed available positions in the N/2 range
+        max_tweezed_local = min(max_tweezed, half_range)
+        all_combos = []
+        # Create the possible subsets of ions tweezed.
+        # max_tweezed = 1 so this normally just places the tweezer beam at every position
+        # in the N/2 range
+        for r in range(0, max_tweezed_local + 1):
+            all_combos.extend(itertools.combinations(range(half_range), r))
+
+        # Setting up the rf-harmonic trap parameters for later
+        w_rf_r = f_rf_r * 2 * pi
+        w_rf_r_list = np.full(N, w_rf_r)
+        ueq = ueq_dict[N]
+
+        # Looping over optical tweezer powers, P_opt
+        for P_total in P_opt:
+            #looping over where the tweezer placement is, determined above in all_combos
+            for tweezed_positions in all_combos:
+                # If max_tweezed =/= 1, this divides total power equally amongst every tweezer
+                n_tweezed = len(tweezed_positions)
+                P_per = P_total / n_tweezed if n_tweezed > 0 else 0.0
+
+                # Compute tweezer potential and tweezer trap frequency for this configuration
+                pot = potential(omega_tweezer, linewidths, omega_res, P_per, w0)
+                w_tw_r = omega_tweezer_r(pot, w0, m)
+
+                # Combine tweezed and untweezed radial frequencies
+                # Here we are combining the tweezer radial frequency with the rf radial frequency
+                combo = np.array([
+                    np.sqrt(w_tw_r**2 + w_rf_r_list[i]**2) if i in tweezed_positions else w_rf_r_list[i]
+                    for i in range(N)
+                ])
+
+                # Finding radial modes from the combined frequencies, and the e-vecs and e-values
+                modes = mode_calc_r(m, combo, ueq, N)
+                freqs = np.array([f for f, v in modes], dtype=float) if len(modes) else np.array([], dtype=float)
+                if len(modes):
+                    eigvecs = np.vstack([np.ravel(v) for f, v in modes])  # shape (n_modes, N)
+                else:
+                    eigvecs = np.empty((0, N))
+
+                # Build the dataframe for the output of this configuration
+                row = {
+                    "N": N,
+                    "Tweezed ions": tweezed_positions,
+                    "P_per_tweezer (W)": P_per,
+                    "Combined radial frequencies": combo,
+                }
+
+                # Making sure the overall dataframe has the same number of columns for each N
+                # Fill Mode{i}_freq and Mode{i}_eigvec for i in [0, N-1]
+                for mode_index in range(N):
+                    # creating columns for all possible modes, if that N doesn't have those modes
+                    # then fill it in with NaN
+                    if mode_index < len(freqs):
+                        freq_val = float(freqs[mode_index])
+                        row[f"Mode{mode_index}_freq"] = float(freqs[mode_index])
+                    else:
+                        row[f"Mode{mode_index}_freq"] = np.nan
+
+                    # eigenvector (length N) or NaN array -- unscaled (no eta factor)
+                    if mode_index < eigvecs.shape[0]:
+                        row[f"Mode{mode_index}_eigvec"] = np.ravel(eigvecs[mode_index]).astype(float)
+                    else:
+                        # use full-length nan array to keep shape consistent
+                        row[f"Mode{mode_index}_eigvec"] = np.full(N, np.nan, dtype=float)
+
+                # --- Store completed row ---
+                rows.append(row)
+
+    return pd.DataFrame(rows)
+
+
 def tweezer_combos_full_radial_middle_only(
     omega_tweezer,
     linewidths,
@@ -967,6 +1075,53 @@ def build_mode_series_and_combinations(df):
     mode_series = {i: df[f"Mode{i}_eigvec"] for i in mode_indices}
 
     # Loop through all rows of df and get the ruples of (tweezed_ions, eigvec_array)
+    # Results are stored in a dictionary
+    mode_lists = {}
+    for i in mode_indices:
+        col = f"Mode{i}_eigvec"
+        items = []
+        for idx in df.index:
+            # get tweezed-ion configuration, basically turn () into nan, and (i,) into i
+            tweezed = df.at[idx, "Tweezed ions"]
+            # replace empty tuple with np.nan
+            if tweezed == ():
+                tweezed = np.nan
+            elif len(tweezed) == 1:
+                tweezed = tweezed[0]  # if single-ion tuple, just use the integer
+            val = df.at[idx, col]
+            try:
+                arr = np.asarray(val, dtype=float)
+            except Exception:
+                arr = np.atleast_1d(val)
+            items.append((tweezed, arr))
+        mode_lists[i] = items
+
+    return {"mode_series": mode_series, "mode_lists": mode_lists}
+
+
+def build_mode_series_and_combinations_unscaled(df):
+    """
+    Same as build_mode_series_and_combinations, but for use with a dataframe
+    built from tweezer_combos_full_radial_unscaled (raw, non-eta-scaled Mode{i}_eigvec columns).
+
+    Returns:
+    dictionary of {"mode_series": mode_series, "mode_lists": mode_lists} where:
+        mode_series = {i:df["Mode{i}_eigvec"] for i in mode_indices}
+        mode_lists = {i: list of tuples (tweezed_ions, eigvec_array)}
+    """
+
+    # find Mode{i}_eigvec columns sorted by i
+    # Mode 0 is always the center of mass mode
+    mode_cols = sorted(
+        [c for c in df.columns if re.match(r"^Mode\d+_eigvec$", c)],
+        key=lambda c: int(re.match(r"Mode(\d+)_eigvec$", c).group(1)),
+    )
+    mode_indices = [int(re.match(r"Mode(\d+)_eigvec$", c).group(1)) for c in mode_cols]
+
+    # makes a dictionary to map mode index to the original dataframe column
+    mode_series = {i: df[f"Mode{i}_eigvec"] for i in mode_indices}
+
+    # Loop through all rows of df and get the tuples of (tweezed_ions, eigvec_array)
     # Results are stored in a dictionary
     mode_lists = {}
     for i in mode_indices:
@@ -1221,6 +1376,99 @@ def run_optimal_mode_selection_tweezed_only(
 
     return augmented
 
+def run_optimal_mode_selection_tweezed_only_unscaled(
+    omega_tweezer,
+    linewidths,
+    omega_res,
+    m,
+    mode_calc_r,
+    N,
+    f_rf_r,
+    ueq_dict,
+    P_opt,
+    w0,
+    max_tweezed=1
+):
+    """
+    Same as run_optimal_mode_selection_tweezed_only: the optimal tweezed-ion/mode-mapping
+    winner is still selected using the Lamb-Dicke/eta-scaled coupling values. The only
+    difference is that the returned mode-coupling vector holds the raw mode-vector
+    (eigenvector) components for that winning mapping, not the eta-scaled values.
+    """
+
+    # 1. Build Lamb-Dicke parameter lists for all configurations (used for selection)
+    df = tweezer_combos_full_radial(
+        omega_tweezer, linewidths, omega_res, m,
+        mode_calc_r, N, f_rf_r, ueq_dict, P_opt, w0,
+        max_tweezed=max_tweezed
+    )
+
+  # Filter out P=0 rows (no actual tweezing)
+    df = df[df['P_per_tweezer (W)'] > 1e-12]
+
+    if df.empty:
+        return []
+
+    result = build_mode_series_and_combinations(df)
+    mode_lists_dict = result["mode_lists"]
+
+    # Get rid of all Nan and None keys that correspond to no tweezed ions
+    cleaned = {
+        k: v for k, v in mode_lists_dict.items()
+        if k is not None and not (isinstance(k, float) and math.isnan(k)) and k != ()
+    }
+    mode_lists_dict = cleaned
+
+    if not mode_lists_dict:
+        return []
+
+    # 2. Sort mode indices and collect all mode lists
+    mode_indices = sorted(
+        mode_lists_dict.keys(),
+        key=lambda x: (str(x) if isinstance(x, tuple) else x)
+    )
+    mode_lists_ordered = [mode_lists_dict[i] for i in mode_indices]
+
+    # 3. Combine modes across all tweezed ions (eta-scaled, for selection)
+    combos = combine_lists(*mode_lists_ordered)
+
+    # 4. Condense by min(abs)
+    condensed = {k: condense_by_min_abs(v) for k, v in combos.items()}
+
+    # 5. Filter by max(min(abs)) within each group
+    best_each = {k: filter_by_max_min_abs(v) for k, v in condensed.items()}
+
+    # 6. Select global winners
+    winners = select_global_max_min_abs(list(best_each.values()))
+
+    # 7. Build the raw (unscaled) mode-vector lists for the same configuration
+    df_raw = tweezer_combos_full_radial_unscaled(
+        omega_tweezer, linewidths, omega_res, m,
+        mode_calc_r, N, f_rf_r, ueq_dict, P_opt, w0,
+        max_tweezed=max_tweezed
+    )
+    df_raw = df_raw[df_raw['P_per_tweezer (W)'] > 1e-12]
+    result_raw = build_mode_series_and_combinations_unscaled(df_raw)
+    mode_lists_raw_dict = {
+        k: v for k, v in result_raw["mode_lists"].items() if k in mode_lists_dict
+    }
+    mode_lists_raw_ordered = [mode_lists_raw_dict[i] for i in mode_indices]
+    raw_combos = combine_lists(*mode_lists_raw_ordered)
+
+    # 8. Compute best ion/mode indices properly, using raw values for the winning mapping
+    augmented = []
+    for tweezed_ion, mapping, score in winners:
+        # Access the corresponding raw values from raw_combos
+        raw_combo_dict = {combo_indices: arr for _, combo_indices, arr in raw_combos[tweezed_ion]}
+        full_mode_vector = raw_combo_dict.get(mapping, np.array(mapping))
+
+        #adding P_opt back to the tuple
+        augmented.append(
+        ((tweezed_ion, mapping, score, P_opt, full_mode_vector))
+        )
+
+    return augmented
+
 def run_optimal_mode_selection_tweezed_only_test(
     omega_tweezer,
     linewidths,
@@ -1280,6 +1528,82 @@ def run_optimal_mode_selection_tweezed_only_test(
         full_lamb_dicke_vector = combo_dict.get(mapping, np.array(mapping))
         augmented.append(
             (tweezed_ion, mapping, score, P_opt, full_lamb_dicke_vector)
+        )
+
+    return augmented
+
+def run_optimal_mode_selection_tweezed_only_test_unscaled(
+    omega_tweezer,
+    linewidths,
+    omega_res,
+    m,
+    mode_calc_r,
+    N,
+    f_rf_r,
+    ueq_dict,
+    P_opt,
+    w0,
+    max_tweezed=1
+):
+    """Same as run_optimal_mode_selection_tweezed_only_test: winner selection still uses
+    Lamb-Dicke/eta-scaled coupling values, but the returned mode-coupling vector holds the
+    raw mode-vector (eigenvector) components for the winning mapping."""
+
+    df = tweezer_combos_full_radial(
+        omega_tweezer, linewidths, omega_res, m,
+        mode_calc_r, N, f_rf_r, ueq_dict, P_opt, w0,
+        max_tweezed=max_tweezed
+    )
+
+    df = df[df['P_per_tweezer (W)'] > 1e-12]
+
+    if df.empty:
+        return []
+
+    result = build_mode_series_and_combinations(df)
+    mode_lists_dict = result["mode_lists"]
+
+    cleaned = {
+        k: v for k, v in mode_lists_dict.items()
+        if k is not None and not (isinstance(k, float) and math.isnan(k)) and k != ()
+    }
+    mode_lists_dict = cleaned
+
+    if not mode_lists_dict:
+        return []
+
+    mode_indices = sorted(
+        mode_lists_dict.keys(),
+        key=lambda x: (str(x) if isinstance(x, tuple) else x)
+    )
+    mode_lists_ordered = [mode_lists_dict[i] for i in mode_indices]
+
+    combos = combine_lists_test(*mode_lists_ordered)
+
+    condensed = {k: condense_by_min_abs(v) for k, v in combos.items()}
+    best_each = {k: filter_by_max_min_abs(v) for k, v in condensed.items()}
+    winners = select_global_max_min_abs(list(best_each.values()))
+
+    # Build the raw (unscaled) mode-vector lists for the same configuration
+    df_raw = tweezer_combos_full_radial_unscaled(
+        omega_tweezer, linewidths, omega_res, m,
+        mode_calc_r, N, f_rf_r, ueq_dict, P_opt, w0,
+        max_tweezed=max_tweezed
+    )
+    df_raw = df_raw[df_raw['P_per_tweezer (W)'] > 1e-12]
+    result_raw = build_mode_series_and_combinations_unscaled(df_raw)
+    mode_lists_raw_dict = {
+        k: v for k, v in result_raw["mode_lists"].items() if k in mode_lists_dict
+    }
+    mode_lists_raw_ordered = [mode_lists_raw_dict[i] for i in mode_indices]
+    raw_combos = combine_lists_test(*mode_lists_raw_ordered)
+
+    augmented = []
+    for tweezed_ion, mapping, score in winners:
+        raw_combo_dict = {combo_indices: arr for _, combo_indices, arr in raw_combos[tweezed_ion]}
+        full_mode_vector = raw_combo_dict.get(mapping, np.array(mapping))
+        augmented.append(
+            (tweezed_ion, mapping, score, P_opt, full_mode_vector)
         )
 
     return augmented
@@ -1380,6 +1704,97 @@ def run_optimal_mode_selection_untweezed_only(
 
     return augmented
 
+def run_optimal_mode_selection_untweezed_only_unscaled(
+    omega_tweezer,
+    linewidths,
+    omega_res,
+    m,
+    mode_calc_r,
+    N,
+    f_rf_r,
+    ueq_dict,
+    P_opt,
+    w0
+):
+    """
+    Same as run_optimal_mode_selection_untweezed_only: the optimal mode-mapping winner is
+    still selected using the Lamb-Dicke/eta-scaled coupling values. The only difference is
+    that the returned mode-coupling vector holds the raw mode-vector (eigenvector)
+    components for that winning mapping, not the eta-scaled values.
+    """
+
+    # 1. Build Lamb-Dicke parameter lists for the untweezed configuration (used for selection)
+    df = tweezer_combos_full_radial(
+        omega_tweezer, linewidths, omega_res, m,
+        mode_calc_r, N, f_rf_r, ueq_dict, P_opt, w0,
+        max_tweezed=0
+    )
+
+    result = build_mode_series_and_combinations(df)
+    mode_lists_dict = result["mode_lists"]
+
+    # ---- CLEAN: remove unusable keys ----
+    cleaned = {
+        k: v for k, v in mode_lists_dict.items()
+        if k is not None and not (isinstance(k, float) and math.isnan(k)) and k != ()
+    }
+    mode_lists_dict = cleaned
+
+    if not mode_lists_dict:
+        return []
+
+    # 2. Sort mode indices numerically if possible
+    mode_indices = sorted(
+        mode_lists_dict.keys(),
+        key=lambda x: (str(x) if isinstance(x, tuple) else x)
+    )
+
+    if not mode_indices:
+        return []
+
+    # 3. Collect lists in canonical order
+    mode_lists_ordered = [mode_lists_dict[i] for i in mode_indices]
+
+    # 4. Combine modes (eta-scaled, for selection)
+    combos = combine_lists(*mode_lists_ordered)
+
+    # 5. Condense by min(abs)
+    condensed = {k: condense_by_min_abs(v) for k, v in combos.items()}
+
+    # 6. Filter by max(min(abs)) within each group
+    best_each = {k: filter_by_max_min_abs(v) for k, v in condensed.items()}
+
+    # 7. Select global winners
+    winners = select_global_max_min_abs(list(best_each.values()))
+
+    # 8. Build the raw (unscaled) mode-vector lists for the same configuration
+    df_raw = tweezer_combos_full_radial_unscaled(
+        omega_tweezer, linewidths, omega_res, m,
+        mode_calc_r, N, f_rf_r, ueq_dict, P_opt, w0,
+        max_tweezed=0
+    )
+    result_raw = build_mode_series_and_combinations_unscaled(df_raw)
+    mode_lists_raw_dict = {
+        k: v for k, v in result_raw["mode_lists"].items() if k in mode_lists_dict
+    }
+    mode_lists_raw_ordered = [mode_lists_raw_dict[i] for i in mode_indices]
+    raw_combos = combine_lists(*mode_lists_raw_ordered)
+
+    # 9. Compute best ion/mode indices properly, using raw values for the winning mapping
+    augmented = []
+    for tweezed_ion, mapping, score in winners:
+        # Access the corresponding raw values from raw_combos
+        raw_combo_dict = {combo_indices: arr for _, combo_indices, arr in raw_combos[tweezed_ion]}
+        full_mode_vector = raw_combo_dict.get(mapping, np.array(mapping))
+
+        augmented.append(
+            (
+                (tweezed_ion, mapping, score, P_opt, full_mode_vector)
+            )
+        )
+
+    return augmented
+
 def run_optimal_mode_selection_untweezed_only_test(
     omega_tweezer,
     linewidths,
@@ -1434,6 +1849,79 @@ def run_optimal_mode_selection_untweezed_only_test(
         full_lamb_dicke_vector = combo_dict.get(mapping, np.array(mapping))
         augmented.append(
             (tweezed_ion, mapping, score, P_opt, full_lamb_dicke_vector)
+        )
+
+    return augmented
+
+def run_optimal_mode_selection_untweezed_only_test_unscaled(
+    omega_tweezer,
+    linewidths,
+    omega_res,
+    m,
+    mode_calc_r,
+    N,
+    f_rf_r,
+    ueq_dict,
+    P_opt,
+    w0
+):
+    """Same as run_optimal_mode_selection_untweezed_only_test: winner selection still uses
+    Lamb-Dicke/eta-scaled coupling values, but the returned mode-coupling vector holds the
+    raw mode-vector (eigenvector) components for the winning mapping."""
+
+    df = tweezer_combos_full_radial(
+        omega_tweezer, linewidths, omega_res, m,
+        mode_calc_r, N, f_rf_r, ueq_dict, P_opt, w0,
+        max_tweezed=0
+    )
+
+    result = build_mode_series_and_combinations(df)
+    mode_lists_dict = result["mode_lists"]
+
+    cleaned = {
+        k: v for k, v in mode_lists_dict.items()
+        if k is not None and not (isinstance(k, float) and math.isnan(k)) and k != ()
+    }
+    mode_lists_dict = cleaned
+
+    if not mode_lists_dict:
+        return []
+
+    mode_indices = sorted(
+        mode_lists_dict.keys(),
+        key=lambda x: (str(x) if isinstance(x, tuple) else x)
+    )
+
+    if not mode_indices:
+        return []
+
+    mode_lists_ordered = [mode_lists_dict[i] for i in mode_indices]
+
+    combos = combine_lists_test(*mode_lists_ordered)
+
+    condensed = {k: condense_by_min_abs(v) for k, v in combos.items()}
+    best_each = {k: filter_by_max_min_abs(v) for k, v in condensed.items()}
+    winners = select_global_max_min_abs(list(best_each.values()))
+
+    # Build the raw (unscaled) mode-vector lists for the same configuration
+    df_raw = tweezer_combos_full_radial_unscaled(
+        omega_tweezer, linewidths, omega_res, m,
+        mode_calc_r, N, f_rf_r, ueq_dict, P_opt, w0,
+        max_tweezed=0
+    )
+    result_raw = build_mode_series_and_combinations_unscaled(df_raw)
+    mode_lists_raw_dict = {
+        k: v for k, v in result_raw["mode_lists"].items() if k in mode_lists_dict
+    }
+    mode_lists_raw_ordered = [mode_lists_raw_dict[i] for i in mode_indices]
+    raw_combos = combine_lists_test(*mode_lists_raw_ordered)
+
+    augmented = []
+    for tweezed_ion, mapping, score in winners:
+        raw_combo_dict = {combo_indices: arr for _, combo_indices, arr in raw_combos[tweezed_ion]}
+        full_mode_vector = raw_combo_dict.get(mapping, np.array(mapping))
+        augmented.append(
+            (tweezed_ion, mapping, score, P_opt, full_mode_vector)
         )
 
     return augmented
@@ -1992,6 +2480,25 @@ def plot_mode_table_from_results_test(
         cell.set_linewidth(2)
 
     fw = "bold" if bold else "normal"
+
+    # If row_label_colors names a single qualitative colormap (e.g. ["Paired"]),
+    # expand it into one color per row, striding through the palette so adjacent
+    # rows get distinct hues instead of neighboring shades of the same hue
+    # (tab20b/tab20c/tab20c group 4 shades per hue; Paired/tab20 group 2).
+    if (
+        row_label_colors is not None
+        and len(row_label_colors) == 1
+        and isinstance(row_label_colors[0], str)
+    ):
+        try:
+            mcolors.to_rgba(row_label_colors[0])
+        except ValueError:
+            cmap_name = row_label_colors[0]
+            row_cmap = plt.get_cmap(cmap_name)
+            palette = row_cmap.colors if hasattr(row_cmap, "colors") else [row_cmap(k) for k in range(row_cmap.N)]
+            stride = 4 if cmap_name.lower() in ("tab20b", "tab20c") else 2
+            palette = palette[::stride]
+            row_label_colors = [palette[k % len(palette)] for k in range(len(table_data))]
 
     # Apply colors to ion cells using absolute values; display text stays empty
     for i, row in enumerate(table_data, start=1):
